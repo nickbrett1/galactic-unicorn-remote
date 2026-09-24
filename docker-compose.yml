@@ -16,7 +16,14 @@ services:
     ports:
       - "0.0.0.0:3009:3000"
 
-    environment: {}
+    # The token is a runtime environment value, never a committed default:
+    # the service refuses to start in a non-dev run without it
+    # (implementation-considerations §7.5, AD-14). Compose reads it from the
+    # `.env` file beside this one (mode 600, never committed — see
+    # .env.example), and `:?` fails the deploy loudly rather than starting a
+    # container that would exit on boot.
+    environment:
+      DEVICE_TOKEN: ${DEVICE_TOKEN:?DEVICE_TOKEN must be set — copy .env.example to .env and fill it in, or export it}
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Services"
