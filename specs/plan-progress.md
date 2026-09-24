@@ -205,3 +205,28 @@ endpoint returns the same `302` back to the code-entry page as an allowed one wo
 endpoint cannot be used to enumerate who has access. So the "a stranger's email gets refused" half of the
 acceptance criterion needs the two-minute human test: request a code for a non-household address, confirm
 no mail arrives and the code step refuses it.
+
+### Phase A acceptance — the door works (2026-09-24)
+
+With the mis-typed email corrected the code arrives and login succeeds; `home-display.fintechnick.com` is
+reachable from a phone/browser that has never been on the tailnet. Unauthenticated, every path still
+returns the same `302` to the Access login, so the door is closed to everyone else.
+
+**The blocker was a Cloudflare Worker route, and it is worth writing down because the symptom was
+misleading.** Signed in, the hostname served the *existing website* rather than this app. The tunnel was
+correct throughout — its startup log lists `home-display.fintechnick.com → http://192.168.1.2:3009`, the
+app answered on `3009`, and DNS was not at fault. A Worker route on that hostname was running before the
+origin, so the tunnel never received the request.
+
+**Why it looked like an Access problem and was not:** Access is evaluated at the edge, keyed on the
+hostname, *before* an origin is selected. So "it asked me to log in" proves Access works and says nothing
+about where the request is forwarded afterwards. The failure was invisible until *after* login — the
+hardest place to see it from, because everything up to that point looked correct. For anything else put
+behind this zone, the lesson is: a hostname can be correctly tunnelled, correctly protected, and still
+served by something else entirely, and the only reliable check is what the *origin* returns —
+`GET /health` answering `{"status":"ok"}` rather than a website 404.
+
+**Also corrected here:** the pre-auth `CF_AppSession` cookie's `Expires` (a flat 24 h on every probe) is
+**not** a read of the app's Session Duration — it is minted per unauthenticated hit to carry the login
+flow. The earlier note in this file treating it as the setting was wrong; the post-login cookie is the one
+to read.
