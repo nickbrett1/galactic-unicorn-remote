@@ -126,7 +126,7 @@ Dockerfile's `org.opencontainers.image.source` label is documented as making tha
 Either the package is made public (GitHub package settings) or the NAS holds a `read:packages` credential
 for `docker login ghcr.io`; until then Watchtower cannot pull and the container cannot start.
 
-**Also outstanding on the NAS** (from the NAS agent's live memo, `memos/THurnfcjrto8SktaVzx48o`):
+**Also outstanding on the NAS** (from the NAS agent's live memo, `memos/W75XRR96cxRsVuCqxAsNXo`):
 `cloudflared` is not stood up — no Cloudflare tunnel token is available to the NAS and neither is a
 Doppler `common/*` token, so that is a dashboard/human action; the tunnel ingress rules and Access policy
 (§8.1/§8.4) are unapplied for the same reason; and 192.168.1.2 is *assigned* but `BOOTIF=dhcp`-reserved is
@@ -153,3 +153,21 @@ Homepage's own config (`config/services.yaml:408`), so memory was the only thing
     not get one.
 - `deploy/README.md`: §9/§10 document the tunnel (remotely managed, outbound-only, no published ports) and
   the memory-limit convention.
+
+**Applied and verified on the NAS** (`memos/THurnfcjrto8SktaVzx48o`). Both caps are live:
+
+| Container | `HostConfig.Memory` | Compose file on the NAS |
+|---|---|---|
+| `galactic-unicorn-remote` | 536870912 (512m) | `/volumeUSB1/usbshare/docker/galactic-unicorn-remote/docker-compose.yml` |
+| `cloudflared` | 134217728 (128m) | `/volumeUSB1/usbshare/docker/cloudflared/compose.yaml` |
+
+Both recreated; after the recreate the app answers `GET /health` → 200 `{"status":"ok"}` and `cloudflared`
+logs four registered connections (connIndex 0–3, quic) with preflight "Environment is healthy" and no errors
+(the tunnel drops for a second or two on recreate, which is the one cost of the change). Neither file gained
+a watchtower label — see the `cloudflared.compose.yml` header for why the tunnel is deliberately the one
+container left out of Watchtower.
+
+Note that the NAS keeps its own copy of each compose file (Container Manager needs a local one) and there is
+**no git clone on the NAS**, so edits land twice: in this repo, and by hand on the NAS. The app's file was
+previously hand-refreshed from `docker-compose.yml` at commit `cec5eca`; the `mem_limit` line is a manual
+edit on top, so a future hand-copy of the repo file keeps it only because the repo now carries it too.
