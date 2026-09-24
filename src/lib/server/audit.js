@@ -19,6 +19,7 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { config } from "./config.js";
+import { broadcastAudit } from "./events.js";
 
 /** The closed set of outcomes (`event-flow.md` §4). */
 export const AUDIT_OUTCOMES = Object.freeze([
@@ -94,6 +95,7 @@ export function buildAuditRow(input) {
 export function appendAudit(input, path = config.auditLogPath) {
   const row = buildAuditRow(input);
   writeRow(row, path);
+  broadcastAudit(row);
   return row;
 }
 

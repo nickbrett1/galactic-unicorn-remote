@@ -22,6 +22,7 @@
  */
 
 import { config } from "./config.js";
+import { broadcastState } from "./events.js";
 import { reseedGen } from "./reconcile.js";
 
 function initialState() {
@@ -95,11 +96,13 @@ export function setDesired({
     ...(routine ? { routine } : {}),
     expires_at: nowS + ttlS,
   };
+  broadcastState();
   return state.desired;
 }
 
 export function clearDesired() {
   state.desired = null;
+  broadcastState();
 }
 
 /**
@@ -112,6 +115,7 @@ export function clearDesired() {
 export function recordObserved(report, nowS = nowEpochS()) {
   state.observed = { ...report, received_at: nowS };
   state.polled = true;
+  broadcastState();
   return state.observed;
 }
 

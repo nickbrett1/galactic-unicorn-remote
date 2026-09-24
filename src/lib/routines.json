@@ -1,20 +1,23 @@
 {
-  "$comment": "The routine catalogue — the SINGLE SOURCE OF TRUTH for routine ids and labels (memo §12; implementation-considerations §8). No component or handler may hard-code a label or an artwork path; both surfaces (panel + remote UI) read identity from here. Id `cleanup` carries label 'Cleanup' on both surfaces.",
+  "$comment": "The routine catalogue — the SINGLE SOURCE OF TRUTH for routine ids, labels and artwork (memo §12; implementation-considerations §8; ui/design-system.md §2). No component or handler may hard-code a label or an artwork path; both surfaces (panel + remote UI) read identity from here. `artwork` is the remote's identity channel for the panel symbol; no icon font, no hard-coded path in any component. Id `cleanup` carries label 'Cleanup' on both surfaces.",
   "routines": [
     {
       "id": "bathtime",
       "label": "Bathtime",
-      "symbol": "duck"
+      "symbol": "duck",
+      "artwork": "🦆"
     },
     {
       "id": "booktime",
       "label": "Booktime",
-      "symbol": "book"
+      "symbol": "book",
+      "artwork": "📖"
     },
     {
       "id": "cleanup",
       "label": "Cleanup",
-      "symbol": "toy-box"
+      "symbol": "toy-box",
+      "artwork": "🧸"
     }
   ]
 }
