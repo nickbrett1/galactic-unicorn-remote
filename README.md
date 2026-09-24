@@ -12,6 +12,8 @@ This project includes the following capabilities:
 - **Docker Container**: Containerize the project and publish to the GitHub Container Registry (GHCR) for deployment to a NAS or self-hosted host via Docker Compose. Mutually exclusive with other deployment systems.
 - **Buildkite Integration**: Runs CI on a self-hosted Buildkite agent (Apple silicon) instead of a metered cloud fleet. The pipeline and its GitHub webhook are created during generation, so there is no manual "set up project" step. It can coexist with an existing CI provider, so a repository can migrate without a flag day.
 - **ESLint + SonarJS**: Adds fast, zero-configuration code quality linting using eslint-plugin-sonarjs and eslint-plugin-security. Runs in ~5–10s vs 1–2 minutes for SonarCloud.
+- **Doppler Secrets Management**: Integrates Doppler for secure secrets management. Enables the various MCP servers that rely on privileged tokens to access their services (e.g. Buildkite, GitHub, SonarQube).
+- **AI Coding Agents**: Sets up the AI coding agents in the devcontainer: goose (config, MCP servers and spec-first recipes) plus the Antigravity CLI.
 
 ## Setup
 
@@ -27,6 +29,40 @@ This project includes the following capabilities:
    ```bash
    npm run dev
    ```
+
+## Doppler
+
+This project uses Doppler for secrets from the shared `common` project
+(config `dev`) — no per-repo Doppler project is created. First use (links
+the shared project and `dev` config):
+
+```bash
+doppler setup --project common --config dev
+```
+
+If your repo needs app-specific secrets that shouldn't live in the shared
+`common` project, regenerate it with the doppler capability set to
+`projectStrategy: "new"` to get a dedicated project.
+
+The Doppler CLI is installed in the devcontainer — it must be on PATH for the
+VS Code extension and `doppler run` to work. Auth is persisted via the host
+`~/.doppler` bind-mount.
+
+### Env-var precedence (read this if `doppler run` hits the wrong project)
+
+Doppler resolves its target as **environment variables > `doppler.yaml` >
+`~/.doppler` scoped config**. If your shell — or the session that launched
+the devcontainer (e.g. an agent runtime) — exports `DOPPLER_PROJECT` /
+`DOPPLER_CONFIG` / `DOPPLER_ENVIRONMENT`, those silently override this
+repo's `doppler.yaml` and every `doppler` command targets the wrong
+project. The devcontainer's post-create setup pins this repo's context
+(`common`/`dev`) in `~/.bashrc` and `~/.zshrc` and warns at
+setup if resolution still mismatches. To force the correct context manually:
+
+```bash
+unset DOPPLER_PROJECT DOPPLER_CONFIG DOPPLER_ENVIRONMENT
+doppler setup --no-interactive --project common --config dev
+```
 
 ## Deployment
 

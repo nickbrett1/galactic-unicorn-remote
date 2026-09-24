@@ -21,11 +21,12 @@ artifact and is never used as a deployable image.
 
 - The registry namespace (`nickbrett1`) is derived from the
   authenticated GitHub identity at generation time.
-- Registry credentials come from the agent's `environment` hook, where
-  they are set by name:
-  - `GHCR_USERNAME` — the GitHub account name
-  - `GHCR_TOKEN` — a **classic** PAT with the `write:packages` scope, used
-    to push to GHCR
+- Registry credentials are resolved at run time from Doppler
+  (`common`/`prd`, secret `GHCR_UPDATE_TOKEN`) using the `DOPPLER_TOKEN` the
+  agent's `environment` hook provides:
+  - `GHCR_USERNAME` — the GHCR namespace the image is published under
+  - the resolved `GHCR_UPDATE_TOKEN` — a **classic** PAT with the
+    `write:packages` scope, used to push to GHCR
 - **Package visibility** defaults to `public` (so the NAS/Watchtower can pull
   with **no credentials**). The generated Dockerfile carries
   `org.opencontainers.image.source=https://github.com/nickbrett1/galactic-unicorn-remote`,
@@ -39,18 +40,14 @@ artifact and is never used as a deployable image.
 Before the first push can publish an image, the agent must supply the registry
 credentials:
 
-1. In the agent's `environment` hook, export:
-   - `GHCR_USERNAME` = your GitHub username
-   - `GHCR_TOKEN` = a **classic** personal access token with the
-     `write:packages` scope — create one at
-     https://github.com/settings/tokens/new?scopes=write:packages (the UI
-     auto-selects the `repo` scope alongside it)
+1. In the agent's `environment` hook, export `DOPPLER_TOKEN` so the
+   `docker_publish` step can read `GHCR_UPDATE_TOKEN` from Doppler
+   (`common`/`prd`) at run time.
 2. Confirm `plugins-path` is set in `buildkite-agent.cfg` — every step here
    uses a plugin, and agent v4 has no usable default.
 
-A step-level `env:` value does **not** reach the container unless the name
-is listed in the docker plugin's `environment:`, which is why these live in the
-agent hook. See `.buildkite/README.md` for the full list of agent
+The registry token never lands in the agent's `environment` hook, where
+every job on the fleet could read it. See `.buildkite/README.md` for the full list of agent
 prerequisites.
 
 > GitHub **fine-grained** PATs cannot access the Container registry (GHCR)

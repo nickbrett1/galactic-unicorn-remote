@@ -48,7 +48,11 @@ steps:
       - |
         set -euo pipefail
         CONTAINER="$$SMOKE_IMAGE-$$BUILDKITE_JOB_ID"
-        trap 'docker rm -f "$$CONTAINER" >/dev/null 2>&1 || true' EXIT
+        # Remove the per-commit smoke image too, and survive cancellation: a
+        # killed shell does not run its EXIT trap, so these leaked at ~1 GiB
+        # each on mac-studio (2026-09-23: 39 images).
+        trap 'exit 143' TERM INT
+        trap 'docker rm -f "$$CONTAINER" >/dev/null 2>&1 || true; docker rmi "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" >/dev/null 2>&1 || true' EXIT
         docker run -d --name "$$CONTAINER" "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" >/dev/null
         # Poll the DECLARED healthcheck. A container that exits (the old rust
         # stub restart-looped) is a failure, so running is checked as well as
@@ -86,10 +90,12 @@ steps:
       CACHE_REF: ghcr.io/nickbrett1/galactic-unicorn-remote:buildcache
     commands:
       - |
-        # No doppler capability: the registry credentials come from the agent's
-        # `environment` hook, where they are set by name.
-        if [ -z "$$GHCR_USERNAME" ] || [ -z "$$GHCR_TOKEN" ]; then
-          echo "GHCR_USERNAME/GHCR_TOKEN are not set on the agent - cannot publish." >&2
+        # Resolved at run time, never stored in the repository and never in the
+        # agent's environment hook, where every job on the fleet could read it.
+        GHCR_USERNAME=nickbrett1
+        GHCR_TOKEN="$$(curl -fsS -H "Authorization: Bearer $$DOPPLER_TOKEN" "https://api.doppler.com/v3/configs/config/secret?project=common&config=prd&name=GHCR_UPDATE_TOKEN" | sed -n 's/.*"raw"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+        if [ -z "$$GHCR_TOKEN" ]; then
+          echo "GHCR_UPDATE_TOKEN is missing from Doppler (common/prd) - cannot publish." >&2
           exit 1
         fi
         # One shell on purpose: Buildkite runs each command in its own shell, so
@@ -109,7 +115,12 @@ steps:
         # specs/015-genproj-docker-publish-idempotent.
         export DOCKER_AUTH_CONFIG='{"auths":{"ghcr.io":{"auth":"'"$$(printf '%s:%s' "$$GHCR_USERNAME" "$$GHCR_TOKEN" | base64)"'"}}}'
         BUILDX_BUILDER_NAME="bk-$$BUILDKITE_PIPELINE_SLUG-$$BUILDKITE_JOB_ID"
-        trap 'docker buildx rm "$$BUILDX_BUILDER_NAME" >/dev/null 2>&1 || true' EXIT
+        # Cleanup must run on cancellation too. A shell killed by SIGTERM or
+        # SIGINT does not run its EXIT trap, which is exactly how builders and
+        # their multi-GB BuildKit state volumes leaked (mac-studio, 2026-09-23:
+        # ~38 GiB of orphaned buildx_buildkit_*_state volumes).
+        trap 'exit 143' TERM INT
+        trap 'docker buildx rm -f "$$BUILDX_BUILDER_NAME" >/dev/null 2>&1 || true; docker volume rm "buildx_buildkit_$$${BUILDX_BUILDER_NAME}0_state" >/dev/null 2>&1 || true' EXIT
         # Skip if this commit is already published: the release step's ls-remote
         # guard, for an image. Only a positive answer skips - if the registry
         # cannot be reached the push still runs, because "could not ask" must
