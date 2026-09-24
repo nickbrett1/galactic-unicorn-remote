@@ -88,3 +88,25 @@ Lightweight progress record. Authority: `specs/plan.md`, `specs/spec/implementat
 - **B9** — a real push/main build is needed to confirm the green CI build; not run (no deploy/push allowed).
 - Open decisions O1–O11 implemented at their recommended defaults, each marked in-code as pending
   ratification; ADRs (`specs/spec/docs/adr/0008+`) are a later step.
+
+## B9 follow-up — the first real main-branch build (2026-09-24)
+
+Builds 1–11 had all been red, which is why GHCR held no image and the NAS could not pull one. Two
+independent causes, both fixed:
+
+- **Build 10** — `npm test` failed 3 of 121 specs in `tests/ui-page.test.js`, and only in CI. The
+  devcontainer runs Node 24; the build step runs `node:22-bookworm`. `act` flushes the microtask queue
+  once, and the POST handler's `fetch` → `Response.json()` handshake needs more turns than that on
+  undici's stream machinery under Node 22, so three specs asserted an intermediate state that had not
+  been painted. The component is correct in both; `click()` now drains pending microtasks explicitly
+  (`flushAsync()`). Verified 121/121 under Node 22 *and* Node 24.
+- **Build 11** — the `docker_smoke` step failed: it starts the container with **no environment**, and
+  `config.js` refuses to start in a non-dev run without `DEVICE_TOKEN` (`implementation-considerations`
+  §7.5, AD-14), while the Dockerfile's runtime stage sets `NODE_ENV=production`. The container exited on
+  boot, so it never reached the healthcheck, and publish is gated behind that step. The spec's fail-fast
+  is kept; `.buildkite/pipeline.yml` now supplies a throwaway `DEVICE_TOKEN` to the smoke container only.
+  **This is a divergence from the generated pipeline** — a genproj regeneration supplies no environment
+  and would reintroduce the failure, so the reason is commented at the call site.
+
+Neither was a defect in the service: build 10's `build`+`lint` steps passed, and build 11's `build` and
+`docker_smoke`'s image build both passed.

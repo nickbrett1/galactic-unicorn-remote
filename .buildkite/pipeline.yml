@@ -53,7 +53,18 @@ steps:
         # each on mac-studio (2026-09-23: 39 images).
         trap 'exit 143' TERM INT
         trap 'docker rm -f "$$CONTAINER" >/dev/null 2>&1 || true; docker rmi "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" >/dev/null 2>&1 || true' EXIT
-        docker run -d --name "$$CONTAINER" "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" >/dev/null
+        # DEVICE_TOKEN is part of the image's documented runtime environment:
+        # the runtime stage sets NODE_ENV=production, and config.js refuses to
+        # start in a non-dev run without a token (implementation-considerations
+        # §7.5, AD-14 — a NAS environment value, never a committed default).
+        # Without it the container exits on boot, so this step would fail
+        # before it could poll /health and the image would never publish.
+        #
+        # A throwaway value, deliberately: it protects nothing, is not a
+        # credential, and the container it starts is removed on exit. This is
+        # the one place to keep in mind if this pipeline is ever regenerated
+        # (genproj issue: the generated smoke step supplies no environment).
+        docker run -d --name "$$CONTAINER" -e DEVICE_TOKEN=smoke-not-a-secret "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" >/dev/null
         # Poll the DECLARED healthcheck. A container that exits (the old rust
         # stub restart-looped) is a failure, so running is checked as well as
         # health: "not running" is reported with its logs, never mistaken for a
