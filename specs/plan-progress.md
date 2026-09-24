@@ -171,3 +171,37 @@ Note that the NAS keeps its own copy of each compose file (Container Manager nee
 **no git clone on the NAS**, so edits land twice: in this repo, and by hand on the NAS. The app's file was
 previously hand-refreshed from `docker-compose.yml` at commit `cec5eca`; the `mem_limit` line is a manual
 edit on top, so a future hand-copy of the repo file keeps it only because the repo now carries it too.
+
+## Phase A — the Access application exists (2026-09-24)
+
+Created in the dashboard; verified from outside, unauthenticated, with no session cookie.
+
+**The hostname is protected, and nothing leaks around it.** Every path probed — `/`, `/api/state`,
+`/device/poll`, `/health`, and a deliberately nonexistent `/nope-nonexistent` — returns the same
+`302` to `https://bemstudios.cloudflareaccess.com/cdn-cgi/access/login/home-display.fintechnick.com?...`
+with the same app audience (`kid=665cc7a602ece5e9d06a35ca6603190dbde99038887535a4279196fbfcfca12d`),
+and the response carries `www-authenticate: Cloudflare-Access` plus a `CF_AppSession` cookie. Two things
+that matter fall out of that:
+
+- **There is no bypass rule.** `/health` and `/device/*` are *not* excepted, so the public surface cannot
+  reach the device endpoint or the local probe even if someone guesses the path. (The board is unaffected:
+  it dials `192.168.1.2:3009` directly and never traverses the edge, which is the whole point of §8.4.)
+- **One application covers the hostname**, not several overlapping ones — the audience is identical on
+  every path.
+
+**The login page is exactly the intended shape:** title "Log in to home-display", a single email field and
+"Send login code" — One-time PIN, no account to create, nothing to install (§8.1).
+
+**Session duration is still the 24 h default.** `set-cookie: CF_AppSession=...; Expires=<now + 24 h>`
+(repeated on two separate requests, so it is the setting and not a transient). §8.1 asks for about a week:
+change it in the app's *Session Duration* so it is a once-in-a-while event rather than a daily one.
+
+**Cosmetic:** the app is named `home-display` (the hostname) rather than "Home Display". Only the Access
+application name is visible to a signed-in user, so this is the string she sees on the login card.
+
+**Not verifiable from outside, and worth knowing:** whether the Allow rule lists the two household emails
+and nothing else. Cloudflare deliberately does not disclose it — POSTing an unknown address to the OTP
+endpoint returns the same `302` back to the code-entry page as an allowed one would, precisely so the
+endpoint cannot be used to enumerate who has access. So the "a stranger's email gets refused" half of the
+acceptance criterion needs the two-minute human test: request a code for a non-household address, confirm
+no mail arrives and the code step refuses it.
