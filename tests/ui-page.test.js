@@ -44,6 +44,7 @@ class MockEventSource {
   }
 }
 
+/** A JSON response, as the handlers under test return one. */
 function jsonResponse(body, status) {
   return new Response(JSON.stringify(body), {
     status,
@@ -89,11 +90,37 @@ async function emitState(panel) {
   });
 }
 
-/** Click a button and flush the async POST handler. */
+/**
+ * Drain pending microtasks, bounded.
+ *
+ * `act` flushes once, which is not always enough for an async handler: the
+ * `fetch` → `Response.json()` handshake resolves through undici's stream
+ * machinery, and how many turns that takes is undici's business and shifts
+ * between Node releases. Node 24 (the devcontainer) settles it inside `act`'s
+ * first drain; **Node 22, which CI uses, does not** — three specs here failed
+ * only under CI, asserting an intermediate state that had not been painted yet.
+ *
+ * Awaiting `Promise.resolve()` puts this continuation at the back of the
+ * microtask queue, so everything already queued runs first. Bounded, so a
+ * promise that genuinely never settles still fails the assertion that follows
+ * rather than hanging the suite.
+ *
+ * @param {number} turns
+ */
+async function flushAsync(turns = 20) {
+  for (let i = 0; i < turns; i += 1) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+}
+
+/** Click a button and flush the async POST handler it starts. */
 async function click(element) {
   await act(async () => {
     await fireEvent.click(element);
   });
+  await flushAsync();
 }
 
 const future = () => Math.floor(Date.now() / 1000) + 45;
