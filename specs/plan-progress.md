@@ -110,3 +110,25 @@ independent causes, both fixed:
 
 Neither was a defect in the service: build 10's `build`+`lint` steps passed, and build 11's `build` and
 `docker_smoke`'s image build both passed.
+
+## Phase A — state after build 12 (2026-09-24)
+
+The image now exists. Build 12 (`a660235`) is the first green build: build → image smoke → publish, all
+passed, and GHCR holds `ghcr.io/nickbrett1/galactic-unicorn-remote:latest` (manifest list
+`sha256:27774a8fb7e5bed884c02463bca5ee271d36a2bde4f94c3b6f9edcf4ffef2be8`) plus the per-commit tag.
+
+**Blocking the NAS deploy — the GHCR package is private.** An anonymous pull token is refused
+(`https://ghcr.io/token?scope=repository:nickbrett1/galactic-unicorn-remote:pull` → 401, while a
+known-public control returns 200), and the package page 404s anonymously, although the repository itself
+is public (200 anonymously). The generated `docker-compose.yml` comment — "for public packages no registry
+credentials are required on the host" — assumes the package follows the repo's visibility, and the
+Dockerfile's `org.opencontainers.image.source` label is documented as making that automatic. It has not.
+Either the package is made public (GitHub package settings) or the NAS holds a `read:packages` credential
+for `docker login ghcr.io`; until then Watchtower cannot pull and the container cannot start.
+
+**Also outstanding on the NAS** (from the NAS agent's live memo, `memos/THurnfcjrto8SktaVzx48o`):
+`cloudflared` is not stood up — no Cloudflare tunnel token is available to the NAS and neither is a
+Doppler `common/*` token, so that is a dashboard/human action; the tunnel ingress rules and Access policy
+(§8.1/§8.4) are unapplied for the same reason; and 192.168.1.2 is *assigned* but `BOOTIF=dhcp`-reserved is
+unconfirmed. The device token on the NAS was generated locally (`openssl rand -hex 32`) because Doppler
+`common` is not readable from there — that is a working stopgap, not the intended source.
