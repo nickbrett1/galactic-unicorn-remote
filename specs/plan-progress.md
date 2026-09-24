@@ -132,3 +132,24 @@ Doppler `common/*` token, so that is a dashboard/human action; the tunnel ingres
 (§8.1/§8.4) are unapplied for the same reason; and 192.168.1.2 is *assigned* but `BOOTIF=dhcp`-reserved is
 unconfirmed. The device token on the NAS was generated locally (`openssl rand -hex 32`) because Doppler
 `common` is not readable from there — that is a working stopgap, not the intended source.
+
+## Phase A follow-up — memory limits, and where cloudflared lives (2026-09-24)
+
+The Phase A check of the running containers turned up one gap: the house convention on the NAS is a
+`mem_limit` in the compose file, and `galactic-unicorn-remote` had none (`HostConfig.Memory` = 0). The
+watchtower label and all four `homepage.*` labels were already correct, and the service is registered in
+Homepage's own config (`config/services.yaml:408`), so memory was the only thing missing.
+
+- `docker-compose.yml`: added `mem_limit: 512m`. Generous for a service that holds a state mirror plus the
+  audit log; it is a ceiling, not a reservation, so it costs nothing at rest.
+- `deploy/cloudflared.compose.yml` (new): the tunnel connector, version-controlled rather than living only
+  on the NAS. Two decisions are recorded in the file rather than left implicit:
+  - `mem_limit: 128m` — a connector is a few tens of MB resident, so the ceiling never bites in normal
+    operation; it exists so a leak cannot grow unbounded.
+  - **No watchtower label.** It is the only container here deliberately left out of Watchtower. A
+    Watchtower recreate (or a self-update) restarts the connector and drops a registered connection, and
+    the tunnel is infrastructure that should be updated on purpose — the same reasoning that put
+    `--no-autoupdate` on the command line. The app container keeps its watchtower label; the tunnel does
+    not get one.
+- `deploy/README.md`: §9/§10 document the tunnel (remotely managed, outbound-only, no published ports) and
+  the memory-limit convention.

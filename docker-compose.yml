@@ -16,6 +16,11 @@ services:
     ports:
       - "0.0.0.0:3009:3000"
 
+    # House convention on the NAS: cap container memory with a compose
+    # mem_limit rather than letting a runaway process take the box. 512m is
+    # generous for a service that only holds a state mirror plus the audit log.
+    mem_limit: 512m
+
     # The token is a runtime environment value, never a committed default:
     # the service refuses to start in a non-dev run without it
     # (implementation-considerations §7.5, AD-14). Compose reads it from the

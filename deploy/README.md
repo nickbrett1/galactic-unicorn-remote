@@ -136,3 +136,33 @@ generated Dockerfile, compose file and Homepage widget stay consistent:
 
 Regenerate with `overwrite: true` to apply these to an existing repo — existing
 app code is preserved; only generated infra files are updated.
+
+## 9. Public hostname via Cloudflare Tunnel (`cloudflared`)
+
+The phone reaches the service at `home-display.fintechnick.com` through a
+**Cloudflare Tunnel**: `cloudflared` runs on the NAS and dials _out_ to
+Cloudflare's edge, so nothing is published on the router and no inbound port is
+opened. The edge terminates TLS and forwards to the tunnel.
+
+- Definition: `deploy/cloudflared.compose.yml` (+ `deploy/cloudflared.env.example`
+  for the token). This is an **app-level compose**, separate from the service's
+  `docker-compose.yml` — the tunnel is shared infrastructure and outlives any
+  one app.
+- The tunnel is **remotely managed**: ingress rules (`home-display.fintechnick.com`
+  → `http://<nas>:3009`) and the Access policy live in the Cloudflare dashboard,
+  keyed by the tunnel. They are _not_ in this file.
+- **No `ports:`** — an outbound-only connector has nothing to accept.
+- `--no-autoupdate` and **no watchtower label**, deliberately: a self-update or a
+  Watchtower recreate both restart the connector and drop a registered
+  connection. Update it by hand.
+- `mem_limit: 128m`, matching the house convention (`mem_limit` in compose).
+
+`cloudflared` is _not_ watchtower-managed; the app container is. Auth in front of
+the hostname is Cloudflare Access (self-hosted app, Allow rule on the two
+household emails, one-time PIN) — see `specs/spec/` §8.1/§8.4.
+
+## 10. Container memory limits
+
+House convention on the NAS is `mem_limit` in the compose file, not a Docker
+daemon default: `galactic-unicorn-remote` gets `mem_limit: 512m` (a state mirror
+plus the audit log — generous), `cloudflared` gets `128m`.

@@ -1,0 +1,43 @@
+# cloudflared — the Cloudflare Tunnel connector that publishes this service at
+# home-display.fintechnick.com without opening a router port (outbound-only).
+#
+# This file is the source of truth for what runs on the NAS at
+#   /volumeUSB1/usbshare/docker/cloudflared/compose.yaml
+# (the NAS keeps a copy because Container Manager needs a local compose file;
+# keep the two in sync).
+#
+# The tunnel is REMOTELY MANAGED: ingress rules and Access policies live in the
+# Cloudflare dashboard, keyed by the tunnel, not in this file. All this file
+# needs is the tunnel token.
+#
+# Standing it up (the dashboard gives you the token on tunnel creation):
+#   cp cloudflared.env.example cloudflared.env   # then paste the token in
+#   chmod 600 cloudflared.env
+#   docker compose -f cloudflared.compose.yml up -d
+#
+# Two deliberate choices, both about not restarting the tunnel by accident:
+#
+#   * --no-autoupdate  cloudflared updates itself on restart when this flag is
+#     absent. A self-update is a restart, and a restarted connector drops a
+#     registered connection — on a panel that is supposed to be always-up,
+#     updates should be a decision, not a side effect.
+#   * NO watchtower label. Same reason: the tunnel is infrastructure, not an
+#     application. Watchtower on a schedule would bounce the connector under us.
+#     The app container itself keeps its watchtower label; this one is updated
+#     by hand.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+
+    # No `ports:` on purpose. cloudflared only dials OUT to Cloudflare's edge;
+    # it never accepts inbound connections, so publishing a port would be pure
+    # exposure with nothing behind it.
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?TUNNEL_TOKEN must be set — copy cloudflared.env.example to cloudflared.env and paste the tunnel token}
+
+    # Tunnel connectors are small (a few tens of MB resident). 128m is a ceiling
+    # high enough to never bite in normal operation, low enough that a leak
+    # cannot grow unbounded on the NAS.
+    mem_limit: 128m
