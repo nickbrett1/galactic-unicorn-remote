@@ -16,7 +16,7 @@
     description: galactic-unicorn-remote container
     widget:
       type: customapi
-      url: http://localhost:3009/healthz
+      url: http://localhost:3009/health
       mappings:
         - field: status
           label: Status
