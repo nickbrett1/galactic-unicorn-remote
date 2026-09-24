@@ -1,0 +1,83 @@
+---
+title: galactic-unicorn-remote — component graph
+---
+
+```mermaid
+graph TB
+  subgraph phones["Phones (the two doors)"]
+    WP["Wife's phone<br/>(no Tailscale, cellular)"]
+    NP["Nick's phone<br/>(Tailscale)"]
+  end
+
+  subgraph cf["Cloudflare (edge, outbound-only tunnel)"]
+    CFEDGE["Cloudflare edge"]
+    ACCESS["Access policy<br/>Allow: ts.akhtar@gmail.com,<br/>nick.brett1@gmail.com<br/>One-time PIN"]
+    TUN["cloudflared tunnel<br/>(container on NAS)<br/>--token, --no-autoupdate"]
+  end
+
+  subgraph nas["NAS — Synology DS220+ (x86-64)"]
+    subgraph svc["container: galactic-unicorn-remote<br/>SvelteKit 5 on Node (adapter-node)"]
+      UI["GET /  +page.svelte<br/>four controls + mirror"]
+      STATE["GET /api/state<br/>POST /api/start | /cancel | /replace"]
+      SSE["GET /api/events<br/>SSE + 2s fallback"]
+      DEV["GET /device/poll<br/>token; LAN only; NOT tunnel-routed"]
+      HEALTH["GET /health<br/>LAN only; NOT tunnel-routed"]
+      CORE["reconciliation core<br/>desired{gen,action,routine,expires_at}<br/>observed{.., applied_gen}<br/>next_poll_ms"]
+      LOG[("append-only audit log<br/>(when, who, action, did-it-land)")]
+    end
+    HEALTHCHK["Docker HEALTHCHECK<br/>(Dockerfile)"]
+    WT["Watchtower<br/>auto-update from GHCR"]
+    HP["Homepage widget<br/>customapi -> /health"]
+  end
+
+  subgraph board["Galactic Unicorn (Pico W / RP2040) — SEPARATE REPO"]
+    REMOTE["lib/remote.py<br/>poll, WDT feed, apply, report"]
+    ROUTINE["lib/routine.py<br/>UNCHANGED semantics"]
+    BTN["physical buttons<br/>A|B|C|D"]
+  end
+
+  subgraph ci["CI"]
+    BK["Buildkite pipeline<br/>build -> lint -> vitest<br/>-> image smoke -> publish"]
+    GHCR["GHCR<br/>ghcr.io/nickbrett1/galactic-unicorn-remote"]
+  end
+
+  WP -- "HTTPS" --> CFEDGE
+  CFEDGE --> ACCESS --> TUN
+  TUN -- "routes ONLY / and /api/*" --> UI
+  TUN -- "routes ONLY / and /api/*" --> STATE
+  TUN -- "x /device/* -> http_status:404" --> DEV
+  NP -- "http, tailnet (no auth)" --> UI
+  NP --> STATE
+
+  UI --> CORE
+  STATE --> CORE
+  SSE --> CORE
+  DEV --> CORE
+  CORE --> LOG
+  DEV -. "desired + next_poll_ms" .-> REMOTE
+
+  board -- "outbound HTTP GET ~2s/5s<br/>plaintext, LAN only" --> DEV
+  REMOTE --> ROUTINE
+  BTN --> ROUTINE
+
+  HEALTHCHK --> HEALTH
+  HP --> HEALTH
+  BK -- "polls declared healthcheck" --> HEALTH
+  BK --> GHCR
+  GHCR -. "pull" .-> WT
+  WT -. "recreate" .-> svc
+```
+
+## Notes on the graph
+
+- **Every arrow touching the board points *from* the board.** Nothing dials the panel (memo §2, §4).
+  The panel has no listener; that is what lets it live on a DHCP lease that occasionally cannot get
+  an address and still be the right endpoint for a remote trigger.
+- **The tunnel and the board never meet** (memo §8.4). `/device/*` is not merely unauthenticated and
+  hidden — it is structurally absent from the public surface (`http_status:404`).
+- **Exactly one writer per direction** (memo §2): phones write *desired*; the board writes *observed*.
+  That is what makes the whole thing idempotent.
+- **`/health` is a three-consumer contract** (memo §11.17): Dockerfile `HEALTHCHECK`, Homepage
+  `customapi` widget, and the Buildkite image-smoke step that gates publish.
+- **Firmware nodes are drawn but out of scope** for this repo's implementation; only the
+  `lib/remote.py ↔ /device/poll` edge is a shared contract (see `api/device-protocols.md`).

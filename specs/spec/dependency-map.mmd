@@ -1,0 +1,247 @@
+```mermaid
+graph TD
+    n_39c6defe11(["Start and cancel the three household countdowns from a phone by mimicking the four panel buttons (intent)"])
+    n_1a131e50f7(["The remote adds no new panel behaviour — it is a second producer of the four button events (intent)"])
+    n_cd37c4b431(["With this service stopped, every button and countdown on the panel is unchanged (intent)"])
+    n_75df3a79da(["An off-tailnet phone gets the same ability through the Cloudflare Tunnel gated on an allow-listed email (intent)"])
+    n_08b1039ed4(["A command during a network dead window fails visibly and never fires late (intent)"])
+    n_24640ed093(["The UI must distinguish sent from the panel having done it (intent)"])
+    n_d67ef6b63a(["Replace is a cancel-then-start sequence, never a silent switch (intent)"])
+    n_f2ebfc304e(["The board polls the NAS; the server holds desired state with a monotonic gen and the board reports applied_gen and observed state (intent)"])
+    n_9555c76664(["The server owns poll cadence through next_poll_ms, driven by demand (intent)"])
+    n_2629a238bf(["/health is a shared contract for the container HEALTHCHECK, the Homepage widget and the CI image-smoke step (intent)"])
+    n_6dc8c600f9(["CI is Buildkite and deploys are CI-only — build, lint, test, image smoke gating publish, then Watchtower recreates the container (intent)"])
+    n_9045a0ea47(["Two authentications for two doors — Cloudflare Access perimeter plus a LAN device token as defence in depth (intent)"])
+    n_01008107ef(["The container listens on 3000, published 0.0.0.0:3009 so the board's config.py literal can dial it (intent)"])
+    n_faf04128a5(["Every command's outcome is a durable append-only audit record (intent)"])
+    n_2dcc98b940(["No auto-resume after a panel reboot — a panel reboot cannot re-run the last command (intent)"])
+    n_baa1efe0b1(["routines.json is the single source of truth for routine ids and labels (intent)"])
+    n_174b152cb7(["One SvelteKit 5 program on Node serves both the UI and the API (intent)"])
+    n_a8a0246744{{"A remote routine start produces the same tune and timing as a physical button press, and the phone can honestly say whether the panel did it (expectation)"}}
+    n_8048e349b1{{"Remote cancel is the D button — live in PROMPT/COUNTDOWN/HANDOFF, silent, a no-op in AMBIENT (expectation)"}}
+    n_d54daa7e77{{"Exactly four events exist (bathtime, booktime, cleanup, reset); no fifth event is invented (expectation)"}}
+    n_2d9755e2a6{{"The remote introduces no panel behaviour beyond the four existing button events (expectation)"}}
+    n_be3061911f{{"ROUTINE events are inert during COUNTDOWN — no silent switch, no lost countdown (expectation)"}}
+    n_ffdaaf7719{{"Every button and every countdown on the panel is unchanged while the service is stopped (expectation)"}}
+    n_01161c1def{{"Nothing ever dials the board; every connection is outbound and the board has no inbound listener (expectation)"}}
+    n_30a429355c{{"Off-tailnet access is gated by Cloudflare Access on an allow-listed email with one-time PIN (expectation)"}}
+    n_2a4fc62dc0{{"The same UI is reachable on the tailnet with no auth in the way (expectation)"}}
+    n_93671e6a5b{{"Pending desired state expires (~45 s) and is dropped, never queued and fired late (expectation)"}}
+    n_bd87d68566{{"The server refuses to set desired state while the panel is offline (expectation)"}}
+    n_245832ffd2{{"The UI distinguishes a sent command from one the panel has applied, per applied_gen (expectation)"}}
+    n_64670d6081{{"Replace requests cancel, waits for state ambient, then requests start — never a silent switch (expectation)"}}
+    n_c860babee9{{"The server holds desired state with a monotonic gen counter (expectation)"}}
+    n_87ca4e85e5{{"The device reports observed state, applied_gen and next_poll_ms on every poll (expectation)"}}
+    n_9993d5666c{{"The server never computes remaining_s — it relays the board's own countdown (mirror, never a clock) (expectation)"}}
+    n_ac53a50d52{{"next_poll_ms is ~2 s on demand and ~5 s otherwise, driven by pending desired, countdown or viewer (expectation)"}}
+    n_bc8e6e8081{{"/health returns JSON with a status field on the path the healthcheck declares (expectation)"}}
+    n_f7b5d0675e{{"Dockerfile HEALTHCHECK, Homepage widget and CI image smoke all poll the same /health path (expectation)"}}
+    n_5acf588546{{"build, lint and vitest under coverage thresholds block merge and deploy (expectation)"}}
+    n_7e9a67d304{{"The image smoke test polls the declared healthcheck and gates publish; a 404ing health endpoint fails the build (expectation)"}}
+    n_8231ed114b{{"Publish is main-only linux/amd64 from Doppler-resolved GHCR credentials (expectation)"}}
+    n_b274c10d1f{{"Deployments are CI-only; no manual deploy command is run (expectation)"}}
+    n_fa80fd3b47{{"Cloudflare Access is the public perimeter and the only public-door authentication (expectation)"}}
+    n_49a1e1987d{{"The device token is LAN-only defence in depth, never a committed default (expectation)"}}
+    n_7ceb80db3a{{"Cf-Access-Authenticated-User-Email is never an authorisation input unless the JWT is verified (expectation)"}}
+    n_5b305eb88f{{"The device token, WiFi credentials, the Access JWT and any credential are never logged (expectation)"}}
+    n_8f91d82aa6{{"The container listens on 3000 and the host publishes 0.0.0.0:3009 on all interfaces (expectation)"}}
+    n_82047d03f7{{"Each command outcome is a durable append-only row with when, who, action and whether it landed (expectation)"}}
+    n_474c41d046{{"gen is re-seeded from applied_gen + 1 on a new boot id and pending desired is cleared (expectation)"}}
+    n_09cee16967{{"Routine ids (cleanup) and labels (Cleanup) come from routines.json; symbol artwork is the only identity channel (expectation)"}}
+    n_89b6fb75e0{{"The UI and the API are one adapter-node program — no separate frontend artefact, no separate API framework (expectation)"}}
+    n_4adbd7d10b["OpenAPI 3.1 for the service (all eight surfaces) (contract)"]
+    n_ec19119343["The shared board<->server HTTP contract (/device/poll, gen, applied_gen, next_poll_ms, TTL) (contract)"]
+    n_9cacf10259[("System component graph — nodes, the two doors and the LAN device link (artifact)")]
+    n_799ed24857[("Deployment targets — NAS / Cloudflare / GHCR / board / dev infra mapping (artifact)")]
+    n_eb6909d3b4[("State layout — the two slots, gen, TTL and cadence inputs (artifact)")]
+    n_3bdd79af78[("Append-only audit log schema (when, who, action, did-it-land) (artifact)")]
+    n_809739b836[("TypeScript types for Desired/Observed/Response and the events (artifact)")]
+    n_f24eb3d17e[("Command round-trip sequence — press to confirmed (artifact)")]
+    n_2028c50a82[("Replace-conflict sequence — cancel, wait ambient, start (artifact)")]
+    n_c7ce6b1b20[("Door-routing sequence — tunnel vs tailnet vs LAN-only surfaces (artifact)")]
+    n_f974dfbe58[("Device desired-state state machine — the four events x panel state (artifact)")]
+    n_3b739b2170[("Panel lifecycle state machine — boot / online / offline / new boot id (artifact)")]
+    n_445593369f[("UI design system — tokens, the four controls, the sent/done rule, a11y (artifact)")]
+    n_23ee86de28[("Low-fidelity phone wireframes (artifact)")]
+    n_9b6afb39e7[("Capacity model — 1 device, 2 users, poll rates, retention (artifact)")]
+    n_3b1a971b38[("Event flow — device events and the SSE/UI event vocabulary (artifact)")]
+    n_03f1815b82[("Implementation considerations — the constraint ledger and open decisions (artifact)")]
+    n_77b477c968[("ADR 0001 — Buildkite, not CircleCI (artifact)")]
+    n_4f7b950746[("ADR 0002 — one SvelteKit program for UI and API (artifact)")]
+    n_57cf3309bd[("ADR 0003 — LAN bind 0.0.0.0:3009 (artifact)")]
+    n_d04137437d[("ADR 0004 — CI-only deployment (artifact)")]
+    n_5375f74eea[("ADR 0005 — plaintext HTTP on the LAN (artifact)")]
+    n_c9254fe696[("ADR 0006 — SSE with 2 s poll fallback (artifact)")]
+    n_f76d6c1070[("ADR 0007 — secrets via Doppler and NAS environment values (artifact)")]
+    n_5c1715a63b["SvelteKit 5 / Node (adapter-node) program serving the UI and the API (job)"]
+    n_c799ed11d6["Server-side reconcile logic — TTL, gen ordering, conflict policy, next_poll_ms (job)"]
+    n_3f299b47a5["GET /device/poll handler implementing the shared device wire (job)"]
+    n_b0c30092b2["SSE GET /api/events stream plus the 2 s GET /api/state fallback (job)"]
+    n_057e5f0992["hooks.server.js surface-trust and routing guard — never route /device/*, never trust the identity header (job)"]
+    n_924c586652["/health route returning JSON with a status field (job)"]
+    n_3e84a30b1a["Append-only audit-log writer for command outcomes (job)"]
+    n_7c29082a1b["The phone UI — three routine symbols, one Cancel, and the honest sent/done states (job)"]
+    n_72b0ed4aab["Buildkite pipeline with Dockerfile HEALTHCHECK, image smoke and GHCR publish (job)"]
+    n_44f4bf438e("vitest unit tests for TTL, gen ordering both directions, conflict policy and next_poll_ms (verifier)")
+    n_2183c4ba07("curl-equivalent integration tests for /device/poll, /api/start, /api/replace, /api/state and /health (verifier)")
+    n_d85b9cbcf7("Assert the device vocabulary is exactly four events and that ROUTINE events are inert during COUNTDOWN (verifier)")
+    n_2ce4504c80("Unit test the gen high-water mark both directions and re-seed from applied_gen + 1 (verifier)")
+    n_65cefc1c86("Image smoke polls the declared healthcheck and gates publish (verifier)")
+    n_dd9fedb921("Buildkite build, lint and vitest with coverage thresholds on every push (verifier)")
+    n_5d68dcb0e2("Coverage thresholds (statements 80 / branches 50 / functions 80 / lines 80) enforced by npm test (verifier)")
+    n_d00369c67e("SSE and the 2 s fallback tested through the tunnel in Phase D, including the sent-vs-done states (verifier)")
+    n_456fe5f766("Phase C regression test — the panel behaves perfectly with the service switched off (verifier)")
+    n_b9b879ce2c("Design review of the component graph that nothing dials the board and the panel holds no dependency on the server (verifier)")
+    n_0f301bf5ae("Test and design review of tunnel-vs-tailnet surface trust, /device/* never routed, email as display/audit only (verifier)")
+    n_c2977da7f0("Review that the device token is LAN-only defence in depth, the identity header is never authorisation and no secret is logged (verifier)")
+    n_09b985476e("Review that the published 0.0.0.0:3009:3000 mapping and shared /health path are aligned across Dockerfile, compose and CI (verifier)")
+    n_6ab13c769f("Check the audit-log schema and that routine ids/labels come only from routines.json (verifier)")
+    n_fb45efc114("Check the OpenAPI 3.1 document matches the implemented surfaces and the one-program route set (verifier)")
+
+    n_39c6defe11 -->|"defines_success_for"| n_a8a0246744
+    n_39c6defe11 -->|"defines_success_for"| n_8048e349b1
+    n_39c6defe11 -->|"defines_success_for"| n_d54daa7e77
+    n_1a131e50f7 -->|"defines_success_for"| n_2d9755e2a6
+    n_1a131e50f7 -->|"defines_success_for"| n_be3061911f
+    n_cd37c4b431 -->|"defines_success_for"| n_ffdaaf7719
+    n_cd37c4b431 -->|"defines_success_for"| n_01161c1def
+    n_75df3a79da -->|"defines_success_for"| n_30a429355c
+    n_75df3a79da -->|"defines_success_for"| n_2a4fc62dc0
+    n_08b1039ed4 -->|"defines_success_for"| n_93671e6a5b
+    n_08b1039ed4 -->|"defines_success_for"| n_bd87d68566
+    n_24640ed093 -->|"defines_success_for"| n_245832ffd2
+    n_d67ef6b63a -->|"defines_success_for"| n_64670d6081
+    n_f2ebfc304e -->|"defines_success_for"| n_c860babee9
+    n_f2ebfc304e -->|"defines_success_for"| n_87ca4e85e5
+    n_f2ebfc304e -->|"defines_success_for"| n_9993d5666c
+    n_9555c76664 -->|"defines_success_for"| n_ac53a50d52
+    n_2629a238bf -->|"defines_success_for"| n_bc8e6e8081
+    n_2629a238bf -->|"defines_success_for"| n_f7b5d0675e
+    n_6dc8c600f9 -->|"defines_success_for"| n_5acf588546
+    n_6dc8c600f9 -->|"defines_success_for"| n_7e9a67d304
+    n_6dc8c600f9 -->|"defines_success_for"| n_8231ed114b
+    n_6dc8c600f9 -->|"defines_success_for"| n_b274c10d1f
+    n_9045a0ea47 -->|"defines_success_for"| n_fa80fd3b47
+    n_9045a0ea47 -->|"defines_success_for"| n_49a1e1987d
+    n_9045a0ea47 -->|"defines_success_for"| n_7ceb80db3a
+    n_9045a0ea47 -->|"defines_success_for"| n_5b305eb88f
+    n_01008107ef -->|"defines_success_for"| n_8f91d82aa6
+    n_faf04128a5 -->|"defines_success_for"| n_82047d03f7
+    n_2dcc98b940 -->|"defines_success_for"| n_474c41d046
+    n_baa1efe0b1 -->|"defines_success_for"| n_09cee16967
+    n_174b152cb7 -->|"defines_success_for"| n_89b6fb75e0
+    n_2183c4ba07 -->|"verifies"| n_a8a0246744
+    n_d00369c67e -->|"verifies"| n_a8a0246744
+    n_2183c4ba07 -->|"verifies"| n_8048e349b1
+    n_d85b9cbcf7 -->|"verifies"| n_d54daa7e77
+    n_d85b9cbcf7 -->|"verifies"| n_2d9755e2a6
+    n_d85b9cbcf7 -->|"verifies"| n_be3061911f
+    n_44f4bf438e -->|"verifies"| n_be3061911f
+    n_456fe5f766 -->|"verifies"| n_ffdaaf7719
+    n_b9b879ce2c -->|"verifies"| n_01161c1def
+    n_0f301bf5ae -->|"verifies"| n_30a429355c
+    n_0f301bf5ae -->|"verifies"| n_2a4fc62dc0
+    n_44f4bf438e -->|"verifies"| n_93671e6a5b
+    n_44f4bf438e -->|"verifies"| n_bd87d68566
+    n_d00369c67e -->|"verifies"| n_245832ffd2
+    n_2183c4ba07 -->|"verifies"| n_245832ffd2
+    n_44f4bf438e -->|"verifies"| n_64670d6081
+    n_2183c4ba07 -->|"verifies"| n_64670d6081
+    n_44f4bf438e -->|"verifies"| n_c860babee9
+    n_2ce4504c80 -->|"verifies"| n_c860babee9
+    n_2183c4ba07 -->|"verifies"| n_87ca4e85e5
+    n_44f4bf438e -->|"verifies"| n_9993d5666c
+    n_b9b879ce2c -->|"verifies"| n_9993d5666c
+    n_44f4bf438e -->|"verifies"| n_ac53a50d52
+    n_2183c4ba07 -->|"verifies"| n_bc8e6e8081
+    n_65cefc1c86 -->|"verifies"| n_bc8e6e8081
+    n_65cefc1c86 -->|"verifies"| n_f7b5d0675e
+    n_09b985476e -->|"verifies"| n_f7b5d0675e
+    n_dd9fedb921 -->|"verifies"| n_5acf588546
+    n_5d68dcb0e2 -->|"verifies"| n_5acf588546
+    n_65cefc1c86 -->|"verifies"| n_7e9a67d304
+    n_dd9fedb921 -->|"verifies"| n_8231ed114b
+    n_dd9fedb921 -->|"verifies"| n_b274c10d1f
+    n_0f301bf5ae -->|"verifies"| n_fa80fd3b47
+    n_c2977da7f0 -->|"verifies"| n_49a1e1987d
+    n_2183c4ba07 -->|"verifies"| n_49a1e1987d
+    n_c2977da7f0 -->|"verifies"| n_7ceb80db3a
+    n_0f301bf5ae -->|"verifies"| n_7ceb80db3a
+    n_c2977da7f0 -->|"verifies"| n_5b305eb88f
+    n_09b985476e -->|"verifies"| n_8f91d82aa6
+    n_6ab13c769f -->|"verifies"| n_82047d03f7
+    n_2ce4504c80 -->|"verifies"| n_474c41d046
+    n_6ab13c769f -->|"verifies"| n_09cee16967
+    n_d85b9cbcf7 -->|"verifies"| n_09cee16967
+    n_fb45efc114 -->|"verifies"| n_89b6fb75e0
+    n_dd9fedb921 -->|"verifies"| n_89b6fb75e0
+    n_03f1815b82 -->|"verified_by"| n_44f4bf438e
+    n_c799ed11d6 -->|"verified_by"| n_44f4bf438e
+    n_eb6909d3b4 -->|"verified_by"| n_44f4bf438e
+    n_809739b836 -->|"verified_by"| n_2183c4ba07
+    n_3f299b47a5 -->|"verified_by"| n_2183c4ba07
+    n_924c586652 -->|"verified_by"| n_2183c4ba07
+    n_3b1a971b38 -->|"verified_by"| n_d85b9cbcf7
+    n_809739b836 -->|"verified_by"| n_d85b9cbcf7
+    n_f974dfbe58 -->|"verified_by"| n_d85b9cbcf7
+    n_c799ed11d6 -->|"verified_by"| n_2ce4504c80
+    n_eb6909d3b4 -->|"verified_by"| n_2ce4504c80
+    n_3b739b2170 -->|"verified_by"| n_2ce4504c80
+    n_72b0ed4aab -->|"verified_by"| n_65cefc1c86
+    n_799ed24857 -->|"verified_by"| n_65cefc1c86
+    n_72b0ed4aab -->|"verified_by"| n_dd9fedb921
+    n_03f1815b82 -->|"verified_by"| n_dd9fedb921
+    n_77b477c968 -->|"verified_by"| n_dd9fedb921
+    n_72b0ed4aab -->|"verified_by"| n_5d68dcb0e2
+    n_03f1815b82 -->|"verified_by"| n_5d68dcb0e2
+    n_b0c30092b2 -->|"verified_by"| n_d00369c67e
+    n_3b1a971b38 -->|"verified_by"| n_d00369c67e
+    n_445593369f -->|"verified_by"| n_d00369c67e
+    n_c9254fe696 -->|"verified_by"| n_d00369c67e
+    n_9cacf10259 -->|"verified_by"| n_456fe5f766
+    n_03f1815b82 -->|"verified_by"| n_456fe5f766
+    n_9cacf10259 -->|"verified_by"| n_b9b879ce2c
+    n_c7ce6b1b20 -->|"verified_by"| n_0f301bf5ae
+    n_057e5f0992 -->|"verified_by"| n_0f301bf5ae
+    n_03f1815b82 -->|"verified_by"| n_c2977da7f0
+    n_5375f74eea -->|"verified_by"| n_c2977da7f0
+    n_f76d6c1070 -->|"verified_by"| n_c2977da7f0
+    n_057e5f0992 -->|"verified_by"| n_c2977da7f0
+    n_799ed24857 -->|"verified_by"| n_09b985476e
+    n_57cf3309bd -->|"verified_by"| n_09b985476e
+    n_72b0ed4aab -->|"verified_by"| n_09b985476e
+    n_3bdd79af78 -->|"verified_by"| n_6ab13c769f
+    n_3e84a30b1a -->|"verified_by"| n_6ab13c769f
+    n_03f1815b82 -->|"verified_by"| n_6ab13c769f
+    n_5c1715a63b -->|"verified_by"| n_fb45efc114
+    n_4f7b950746 -->|"verified_by"| n_fb45efc114
+    n_5c1715a63b -->|"consumes"| n_4adbd7d10b
+    n_5c1715a63b -->|"consumes"| n_9cacf10259
+    n_c799ed11d6 -->|"consumes"| n_eb6909d3b4
+    n_c799ed11d6 -->|"consumes"| n_809739b836
+    n_c799ed11d6 -->|"consumes"| n_f24eb3d17e
+    n_c799ed11d6 -->|"consumes"| n_2028c50a82
+    n_c799ed11d6 -->|"consumes"| n_03f1815b82
+    n_3f299b47a5 -->|"consumes"| n_ec19119343
+    n_3f299b47a5 -->|"consumes"| n_809739b836
+    n_3f299b47a5 -->|"consumes"| n_f974dfbe58
+    n_b0c30092b2 -->|"consumes"| n_3b1a971b38
+    n_b0c30092b2 -->|"consumes"| n_809739b836
+    n_b0c30092b2 -->|"consumes"| n_c9254fe696
+    n_057e5f0992 -->|"consumes"| n_c7ce6b1b20
+    n_057e5f0992 -->|"consumes"| n_5375f74eea
+    n_924c586652 -->|"consumes"| n_799ed24857
+    n_3e84a30b1a -->|"consumes"| n_3bdd79af78
+    n_3e84a30b1a -->|"consumes"| n_3b1a971b38
+    n_7c29082a1b -->|"consumes"| n_445593369f
+    n_7c29082a1b -->|"consumes"| n_23ee86de28
+    n_7c29082a1b -->|"consumes"| n_3b1a971b38
+    n_7c29082a1b -->|"consumes"| n_f24eb3d17e
+    n_72b0ed4aab -->|"consumes"| n_799ed24857
+    n_72b0ed4aab -->|"consumes"| n_77b477c968
+    n_72b0ed4aab -->|"consumes"| n_d04137437d
+    n_72b0ed4aab -->|"consumes"| n_f76d6c1070
+    n_5c1715a63b -->|"consumes"| n_4f7b950746
+    n_5c1715a63b -->|"consumes"| n_57cf3309bd
+    n_5c1715a63b -->|"consumes"| n_9b6afb39e7
+```

@@ -1,0 +1,78 @@
+{
+  "$comment": "Key-value access patterns for galactic-unicorn-remote's state. There is no relational store requirement in the memos: desired state, observed state and `gen` are a handful of scalars held by one process (memo §5.1, §7.3), and the audit log is 'a small append-only log' (memo §7.3). The single backing store is an OPEN DECISION (description.md §6.4) — in-memory-with-append-only-file vs SQLite. This file pins the ACCESS PATTERNS, which are store-independent.",
+  "keys": {
+    "gen": {
+      "type": "integer",
+      "monotonic": true,
+      "written_by": "durable command edges only (start | cancel | replace-cancel | replace-start)",
+      "read_by": ["/api/state", "/api/events", "/device/poll", "audit log"],
+      "invariant": "never decreases within a process; on a fresh process it is re-seeded from the board's reported applied_gen + 1 so it can never sit below the board's high-water mark (memo §5.1)",
+      "note": "One counter that both sides agree on. No clock is involved on either side."
+    },
+    "desired": {
+      "type": "object",
+      "shape": "{ gen, action: 'start'|'cancel'|'none', routine?, expires_at }",
+      "writer": "browser command endpoints only",
+      "readers": ["/device/poll (apply)", "/api/state (display)", "/api/events (display)"],
+      "ttl_s": 45,
+      "ttl_note": "'~45 s' is the design intent; the exact constant is an OPEN DECISION (description.md §6.4). Expiry is enforced server-side; the board never compares expires_at (memo §5.4).",
+      "on_expiry": "read as { action: 'none' } and dropped; never queued, never fired late (memo §4, §5.4)",
+      "on_new_boot_id": "cleared immediately, before the poll's desired state is computed (memo §5.6)",
+      "invariant": "exactly one writer (the phone) per direction; the board never writes this slot (memo §2)"
+    },
+    "observed": {
+      "type": "object",
+      "shape": "{ boot, fw, applied_gen, state, routine?, remaining_s?, rssi?, uptime_s?, received_at }",
+      "writer": "/device/poll only",
+      "readers": ["/api/state (display)", "/api/events (display)", "audit log"],
+      "invariant": "exactly one writer (the board) per direction; the server never writes this slot (memo §2)",
+      "derived": {
+        "online": "received_at is within the offline threshold; threshold is an OPEN DECISION (description.md §6.4)",
+        "last_seen_s": "now - received_at"
+      }
+    },
+    "applied_gen": {
+      "type": "integer",
+      "writer": "the board (reported every poll, persisted to flash on the board)",
+      "read_by": ["confirmation of 'sent vs done' (memo §9.1)", "next_poll_ms input (memo §6.3.5)", "fresh-server gen re-seed (memo §5.1)"],
+      "note": "Held here only as a mirror of the board's value; the authoritative copy is on the board's flash."
+    },
+    "subscribers": {
+      "type": "integer",
+      "writer": "the SSE route's connection lifecycle",
+      "read_by": ["next_poll_ms input"],
+      "invariant": "a LIVE subscriber count, never 'a page was loaded' (memo §11.7)"
+    },
+    "replace_sequence": {
+      "type": "object | null",
+      "shape": "{ target_routine, cancelled_gen, started_at, abandons_at }",
+      "writer": "POST /api/replace",
+      "note": "Server-side orchestration for cancel → wait for `state: ambient` reported → start. Lives on the server, NOT in the firmware, so no 'authority priority' field enters the toddler-facing state machine (memo §3, §5.5). Abandons if the panel goes away mid-sequence.",
+      "transitions": {
+        "begin": "set desired cancel, record cancelled_gen",
+        "advance": "on a poll reporting state=ambient AND applied_gen >= cancelled_gen, set desired start target_routine",
+        "abandon": "panel offline past abandons_at, or a newer command supersedes this sequence"
+      }
+    },
+    "routines": {
+      "type": "array<{ id, label, symbol }>",
+      "source": "routines.json — the SINGLE SOURCE OF TRUTH for ids and labels; no hard-coded labels anywhere (memo §12)",
+      "ids": ["bathtime", "booktime", "cleanup"],
+      "labels_note": "id `cleanup`, label 'Cleanup', on both surfaces",
+      "symbols_note": "the panel's symbol artwork is the only identity channel on both surfaces (duck / book / toy-box)"
+    }
+  },
+  "cadence": {
+    "next_poll_ms": {
+      "computing_inputs": ["desired gen > applied_gen", "observed.state in {countdown, handoff}", "subscribers > 0"],
+      "values": { "any_input_true_ms": 2000, "no_input_true_ms": 5000 },
+      "invariant": "server-generated and clamped; the board further clamps to its config.py floors/ceilings (memo §6.3.5)",
+      "open_decision": "the server-side clamp values (description.md §6.4)"
+    }
+  },
+  "persistence": {
+    "must_survive_restart": ["nothing strictly (state is a mirror of the board's truth), but the audit log is expected to survive"],
+    "must_not_be_trusted_across_a_fresh_process": ["gen (re-seed from applied_gen + 1)", "desired (TTL has almost certainly expired)"],
+    "must_never_exist_here": ["a server-computed countdown / remaining_s source of truth (memo §5.3)", "a copy of the board's applied_gen as authority (the board's flash is authoritative)"]
+  }
+}

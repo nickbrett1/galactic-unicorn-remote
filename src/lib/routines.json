@@ -1,0 +1,20 @@
+{
+  "$comment": "The routine catalogue — the SINGLE SOURCE OF TRUTH for routine ids and labels (memo §12; implementation-considerations §8). No component or handler may hard-code a label or an artwork path; both surfaces (panel + remote UI) read identity from here. Id `cleanup` carries label 'Cleanup' on both surfaces.",
+  "routines": [
+    {
+      "id": "bathtime",
+      "label": "Bathtime",
+      "symbol": "duck"
+    },
+    {
+      "id": "booktime",
+      "label": "Booktime",
+      "symbol": "book"
+    },
+    {
+      "id": "cleanup",
+      "label": "Cleanup",
+      "symbol": "toy-box"
+    }
+  ]
+}

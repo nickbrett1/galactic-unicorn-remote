@@ -1,4 +1,6 @@
 # Generated infra files (machine output) excluded from prettier --check.
 .agents/
 coverage/
+# Design/plan documents (authored elsewhere, hand-formatted; not the app's lint surface)
+specs/
 wrangler.template.jsonc

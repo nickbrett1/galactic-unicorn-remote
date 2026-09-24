@@ -1,0 +1,451 @@
+openapi: 3.1.0
+info:
+  title: galactic-unicorn-remote
+  version: 1.0.0
+  description: |
+    The NAS service for the Galactic Unicorn remote trigger (phase 2).
+
+    It serves the remote UI **and** the API from one SvelteKit program
+    (memo §7.1; stack-memo §1). Three consumer populations share it, split by
+    policy and routing rather than by interface (memo §7.4, §8.4):
+
+      * **Browsers** on the public door (behind Cloudflare Access) and on the
+        tailnet (no auth) — `GET /`, `/api/*`.
+      * **The board** — `GET /device/poll`, plaintext HTTP, shared token,
+        LAN-only, and **not routed by the tunnel**.
+      * **Local probes** — `GET /health`, LAN-only, not routed by the tunnel.
+
+    The service is a reconciliation server, not a timer and not a queue: it
+    holds *desired state* with a monotonic `gen`, the board reports what it
+    actually did, and pending desired state expires after a ~45 s TTL
+    (memo §5.2, §5.4). The one hard UX rule is that the UI must distinguish
+    "sent" from "the panel did it" (memo §9.1).
+
+    The `/device/poll` wire is the **shared contract** with the separate firmware
+    repo and is specified in full in `api/device-protocols.md`. Firmware
+    internals are out of scope for this repo.
+servers:
+  - url: http://192.168.1.2:3009
+    description: Direct on the NAS LAN (board + tailnet door). Also reached as `http://nas:3009`.
+  - url: https://home-display.fintechnick.com
+    description: Public door — Cloudflare edge → Access → tunnel. Serves only `/` and `/api/*`.
+
+tags:
+  - name: ui
+    description: Browser-facing surfaces. Access-gated on the public door; unauthenticated on the tailnet.
+  - name: device
+    description: The board's poll surface. LAN-only, shared token, never routed by the tunnel.
+  - name: ops
+    description: Shared local probe. Three consumers, one path (memo §11.17).
+
+paths:
+  /:
+    get:
+      tags: [ui]
+      summary: The remote UI
+      description: >
+        One SvelteKit route (`src/routes/+page.svelte`) — mobile-first, deliberately small; it is a
+        remote, not a control panel (memo §9). Four controls mirroring the panel (duck / book /
+        toy-box / Cancel), a live mirror of state/routine/remaining, and a conflict affordance.
+        Handlers call the `/api/*` endpoints below; no logic lives in the browser that is not also
+        in the server.
+      responses:
+        "200":
+          description: The HTML Shell.
+          content:
+            text/html:
+              schema:
+                type: string
+  /api/state:
+    get:
+      tags: [ui]
+      summary: Full state snapshot (initial paint + the SSE fallback)
+      description: >
+        The coherent snapshot the UI needs: the panel's latest observed report, the current desired
+        slot, and the routine catalogue. Also the **2 s polling fallback** if SSE misbehaves
+        (memo §11.8). `remaining_s` is the board's own figure, relayed — the server never computes a
+        countdown (memo §5.3).
+      responses:
+        "200":
+          description: Current state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateSnapshot"
+  /api/events:
+    get:
+      tags: [ui]
+      summary: Server-sent event stream
+      description: >
+        A `+server.js` route returning a `ReadableStream` (stack-memo §2). Frames carry the same
+        shapes as `GET /api/state` and the audit log. Requires a **heartbeat comment every ~15 s**,
+        `text/event-stream`, `no-cache`, and `X-Accel-Buffering: no` — proxied connections idle out
+        around 100 s (memo §11.7). `adapter-node` must not buffer the route. A client must tolerate
+        gaps and re-sync from `GET /api/state`.
+      responses:
+        "200":
+          description: |
+            An `text/event-stream` of named events (`state`, `audit`), with `: heartbeat`
+            comments between them. See `event-flow.md`.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /api/start:
+    post:
+      tags: [ui]
+      summary: Ask the panel to start a routine
+      description: >
+        Sets desired state to `start <routine>`. Resolves the conflict table of memo §5.5 **before**
+        setting anything: if the panel is unreachable the UI refuses; if the panel is already
+        running the requested routine this is a no-op reported as "already running"; if a *different*
+        routine is counting down the server returns a conflict and offers the explicit replace path.
+        A success here means **accepted, not done** (memo §9.1).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRequest"
+      responses:
+        "202":
+          description: Desired state set. The board will apply it on its next poll.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesiredAck"
+        "409":
+          description: A different routine is already counting down. Nothing was set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conflict"
+        "422":
+          description: Unknown routine id (not in `routines.json`). The server validates every input and never echoes it back (memo §10).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The panel is offline. Nothing was set — the UI refuses before setting anything (memo §5.5).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelOffline"
+  /api/cancel:
+    post:
+      tags: [ui]
+      summary: Ask the panel to cancel (= the D button)
+      description: >
+        Sets desired state to `cancel`. Cancel is live in PROMPT, COUNTDOWN and HANDOFF (D is live in
+        every active state, memo §3). Cancel is **silent** on the panel — the phone, not the living
+        room, carries the acknowledgement (memo §11.13). Cancelling from AMBIENT is a no-op.
+      responses:
+        "202":
+          description: Desired state set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesiredAck"
+        "503":
+          description: The panel is offline. Nothing was set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelOffline"
+  /api/replace:
+    post:
+      tags: [ui]
+      summary: Replace a running countdown with a different routine
+      description: >
+        The only way to switch routines. **Never a silent switch** (memo §3, §5.5): the server asks
+        for cancel, waits for the board to report `state: ambient`, then asks for start. The
+        authority-priority reasoning stays out of the toddler-facing state machine. If the panel goes
+        away mid-sequence, the sequence abandons and the UI reports it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRequest"
+      responses:
+        "202":
+          description: The cancel→wait→start sequence has begun; poll/SSE for its outcome.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesiredAck"
+        "409":
+          description: Nothing is running, or the requested routine is the one already running — no replace needed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conflict"
+        "503":
+          description: The panel is offline. Nothing was set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelOffline"
+  /device/poll:
+    get:
+      tags: [device]
+      summary: The board's poll — report observed state, receive desired state and the cadence
+      description: >
+        **The shared contract with the firmware repo** (memo §5.1, §7.2). LAN-only, plaintext HTTP,
+        shared token, and **not routed by the tunnel** (`/device/*` → `http_status:404`, memo §8.4).
+        One call does three things: the board reports observed state, the server answers with desired
+        state, and the server sets the cadence via `next_poll_ms`. Full wire notes, restart semantics
+        and the reconcile rules live in `api/device-protocols.md`.
+      parameters:
+        - $ref: "#/components/parameters/DeviceToken"
+        - name: boot
+          in: query
+          required: true
+          description: Opaque boot id, new on every panel boot. A change makes the server clear pending desired state (memo §5.6) and log it (§12.5).
+          schema: { type: string, maxLength: 16 }
+        - name: fw
+          in: query
+          required: true
+          description: Firmware version on the boot banner.
+          schema: { type: string, maxLength: 16 }
+        - name: applied_gen
+          in: query
+          required: true
+          description: Highest `gen` the board has applied, persisted to flash. The board ignores anything `<=` it.
+          schema: { type: integer, minimum: 0 }
+        - name: state
+          in: query
+          required: true
+          schema: { $ref: "#/components/schemas/PanelState" }
+        - name: routine
+          in: query
+          required: false
+          description: Present only when `state` is `countdown` or `handoff`.
+          schema: { $ref: "#/components/schemas/RoutineId" }
+        - name: remaining_s
+          in: query
+          required: false
+          description: The board's own countdown (ticks_ms-based). Relayed to the UI verbatim; never recomputed server-side (memo §5.3).
+          schema: { type: integer, minimum: 0 }
+        - name: rssi
+          in: query
+          required: false
+          description: Read from the wifi.log path the board already maintains, not re-derived per poll (memo §5.1).
+          schema: { type: integer, maximum: 0 }
+        - name: uptime_s
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Desired state and the poll cadence.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevicePollResponse"
+        "401":
+          description: Missing or wrong device token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Malformed query parameters. The server validates every parameter (memo §10).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /health:
+    get:
+      tags: [ops]
+      summary: Shared local probe
+      description: >
+        **Not part of the protocol.** The container `HEALTHCHECK`, the Homepage `customapi` widget
+        and the pipeline's image-smoke step all poll this one path, and the smoke step **gates
+        publish** — a container that 404s its own health endpoint never turns healthy, so every build
+        fails before the push (memo §11.17; stack-memo §6). The body must be JSON because Homepage
+        parses it; a bare-text reply makes the dashboard tile error. **Change one, change both.**
+        Returns `{"status":"ok"}` today; the existing route is
+        `src/routes/health/+server.js`.
+      responses:
+        "200":
+          description: Healthy. Body carries `status` for the Homepage widget mapping.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+components:
+  parameters:
+    DeviceToken:
+      name: token
+      in: query
+      required: true
+      description: >
+        Shared device token. Transport (query parameter vs header) is an **open decision**
+        (description.md §6.4); a query parameter is proposed because the board's request is already a
+        GET with query parameters and it adds no header machinery to MicroPython. Defence in depth
+        only — anyone on the LAN could press the physical button, so the asset is worth almost
+        nothing (memo §10).
+      schema: { type: string, minLength: 1 }
+  schemas:
+    RoutineId:
+      type: string
+      description: Routine id. `routines.json` is the single source of truth for ids and labels (memo §12).
+      enum: [bathtime, booktime, cleanup]
+    DeviceEvent:
+      type: string
+      description: >
+        The four events the remote can produce — it mimics the buttons and nothing else (memo §3).
+        `reset` is the D button and is what a remote cancel sends.
+      enum: [bathtime, booktime, cleanup, reset]
+    PanelState:
+      type: string
+      description: The panel's own state machine states, as reported by the board. The server never invents them.
+      enum: [ambient, prompt, countdown, handoff]
+    DesiredAction:
+      type: string
+      description: >
+        `none` is a valid, idempotent answer meaning "nothing should be true that isn't" — used when
+        there is no desired state, or once the TTL has expired.
+      enum: [start, cancel, none]
+    StartRequest:
+      type: object
+      required: [routine]
+      additionalProperties: false
+      properties:
+        routine:
+          $ref: "#/components/schemas/RoutineId"
+    Desired:
+      type: object
+      description: >
+        The desired-state slot. Written only by a browser command; read only by the device poll.
+        Exactly one writer per direction (memo §2).
+      required: [gen, action, expires_at]
+      properties:
+        gen:
+          type: integer
+          minimum: 0
+          description: Monotonic counter. The board ignores anything `<= applied_gen`.
+        action:
+          $ref: "#/components/schemas/DesiredAction"
+        routine:
+          $ref: "#/components/schemas/RoutineId"
+        expires_at:
+          type: integer
+          description: >
+            Server epoch seconds at which this desired state is dropped. ~45 s from set
+            (memo §5.4). An expired slot reads as `action: none`.
+    Observed:
+      type: object
+      description: >
+        The observed-state slot. Written only by the device poll; read only by the UI and the
+        audit log. These are exactly the fields the board reports.
+      required: [boot, fw, applied_gen, state]
+      properties:
+        boot: { type: string }
+        fw: { type: string }
+        applied_gen: { type: integer, minimum: 0 }
+        state: { $ref: "#/components/schemas/PanelState" }
+        routine: { $ref: "#/components/schemas/RoutineId" }
+        remaining_s: { type: integer, minimum: 0 }
+        rssi: { type: integer }
+        uptime_s: { type: integer, minimum: 0 }
+    PanelLiveness:
+      type: object
+      description: >
+        Derived, not stored by the board: the free liveness the poll itself provides (memo §4, §9.1).
+        The UI shows this continuously, and it is what turns "sent" into "the panel did it" — or does
+        not.
+      required: [online, last_seen_s]
+      properties:
+        online: { type: boolean }
+        last_seen_s: { type: integer, minimum: 0 }
+        threshold_s:
+          type: integer
+          description: Open decision (description.md §6.4) — the cut-off behind `online`.
+    Routine:
+      type: object
+      required: [id, label, symbol]
+      properties:
+        id: { $ref: "#/components/schemas/RoutineId" }
+        label:
+          type: string
+          description: 'From routines.json; e.g. "Cleanup" for id `cleanup` — never hard-coded (memo §12).'
+        symbol:
+          type: string
+          description: The panel's symbol artwork, the only identity channel on both surfaces (duck / book / toy-box).
+    StateSnapshot:
+      type: object
+      required: [panel, desired, routines]
+      properties:
+        panel:
+          allOf:
+            - $ref: "#/components/schemas/Observed"
+            - $ref: "#/components/schemas/PanelLiveness"
+        desired:
+          $ref: "#/components/schemas/Desired"
+        routines:
+          type: array
+          items: { $ref: "#/components/schemas/Routine" }
+        door:
+          type: object
+          description: >
+            Which door this request arrived through, for display and audit only. The email header is
+            **never** an authorisation input unless the JWT is verified against Cloudflare's Access
+            certs (memo §8.3) — and there are no privilege tiers for it to gate (AD-17/memo §10).
+          properties:
+            kind: { type: string, enum: [tunnel, tailnet, lan] }
+            email: { type: [string, "null"] }
+    DesiredAck:
+      type: object
+      description: >
+        Accepted, **not done**. The UI must not present this as success; it goes "sending…" →
+        confirmed only when the device reports the new `applied_gen` (memo §9.1).
+      required: [gen, action]
+      properties:
+        gen: { type: integer, minimum: 0 }
+        action: { $ref: "#/components/schemas/DesiredAction" }
+        routine: { $ref: "#/components/schemas/RoutineId" }
+        expires_at: { type: integer }
+        ttl_s: { type: integer }
+    DevicePollResponse:
+      type: object
+      description: >
+        Desired state **and** the cadence. `next_poll_ms` is server-generated and clamped; the board
+        obeys it, further bounded by the floors/ceilings in its `config.py` (memo §6.3.5).
+      required: [gen, action, next_poll_ms]
+      properties:
+        gen: { type: integer, minimum: 0 }
+        action: { $ref: "#/components/schemas/DesiredAction" }
+        routine: { $ref: "#/components/schemas/RoutineId" }
+        next_poll_ms:
+          type: integer
+          description: ~5000 when nothing is pending, no countdown is active and no viewer is connected; ~2000 when any of those is true (memo §6.3.5).
+    Conflict:
+      type: object
+      required: [error, current_routine, offers]
+      properties:
+        error: { type: string, const: conflict }
+        current_routine: { $ref: "#/components/schemas/RoutineId" }
+        offers:
+          type: array
+          items: { type: string, enum: [replace] }
+          description: The UI shows the conflict and offers replace explicitly. Never a silent switch (memo §5.5).
+    PanelOffline:
+      type: object
+      required: [error, last_seen_s]
+      properties:
+        error: { type: string, const: panel_offline }
+        last_seen_s: { type: integer, minimum: 0 }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        detail: { type: string }

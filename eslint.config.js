@@ -92,6 +92,9 @@ export default [
       // Vendored agent/MCP tooling (mcp-* proxies) is intentionally not part of
       // the app's lint surface; linting it fails generated projects on CI.
       ".agents/**",
+      // Design/plan documents (hand-formatted reference material) are not part
+      // of the app's lint surface.
+      "specs/**",
     ],
   },
 ];

@@ -1,0 +1,1350 @@
+{
+  "graph": {
+    "id": "global-system-map",
+    "kind": "spec_dependency",
+    "topology": "dag",
+    "status": "accepted",
+    "scope": "global",
+    "generated": true
+  },
+  "nodes": [
+    {
+      "id": "artifact.adr-0001-buildkite",
+      "type": "artifact",
+      "title": "ADR 0001 — Buildkite, not CircleCI",
+      "ref": "docs/adr/0001-buildkite-not-circleci.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0002-one-program",
+      "type": "artifact",
+      "title": "ADR 0002 — one SvelteKit program for UI and API",
+      "ref": "docs/adr/0002-one-sveltekit-program.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0003-lan-bind",
+      "type": "artifact",
+      "title": "ADR 0003 — LAN bind 0.0.0.0:3009",
+      "ref": "docs/adr/0003-lan-bind-0.0.0.0-3009.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0004-ci-only-deploy",
+      "type": "artifact",
+      "title": "ADR 0004 — CI-only deployment",
+      "ref": "docs/adr/0004-ci-only-deployment.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0005-plaintext-http",
+      "type": "artifact",
+      "title": "ADR 0005 — plaintext HTTP on the LAN",
+      "ref": "docs/adr/0005-plaintext-http-on-lan.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0006-sse-fallback",
+      "type": "artifact",
+      "title": "ADR 0006 — SSE with 2 s poll fallback",
+      "ref": "docs/adr/0006-sse-with-poll-fallback.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.adr-0007-secrets-doppler",
+      "type": "artifact",
+      "title": "ADR 0007 — secrets via Doppler and NAS environment values",
+      "ref": "docs/adr/0007-secrets-via-doppler-env.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.audit-schema",
+      "type": "artifact",
+      "title": "Append-only audit log schema (when, who, action, did-it-land)",
+      "ref": "data-architecture/audit-log-schema.sql",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.component-graph",
+      "type": "artifact",
+      "title": "System component graph — nodes, the two doors and the LAN device link",
+      "ref": "topology/component-graph.mmd",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.deployment-targets",
+      "type": "artifact",
+      "title": "Deployment targets — NAS / Cloudflare / GHCR / board / dev infra mapping",
+      "ref": "topology/deployment-targets.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.design-system",
+      "type": "artifact",
+      "title": "UI design system — tokens, the four controls, the sent/done rule, a11y",
+      "ref": "ui/design-system.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.domain-models",
+      "type": "artifact",
+      "title": "TypeScript types for Desired/Observed/Response and the events",
+      "ref": "data-architecture/domain-models.ts",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.event-flow",
+      "type": "artifact",
+      "title": "Event flow — device events and the SSE/UI event vocabulary",
+      "ref": "event-flow.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.flow-command-round-trip",
+      "type": "artifact",
+      "title": "Command round-trip sequence — press to confirmed",
+      "ref": "flows/command-round-trip-sequence.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.flow-device-state-machine",
+      "type": "artifact",
+      "title": "Device desired-state state machine — the four events x panel state",
+      "ref": "flows/device-desired-state-state-machine.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.flow-door-routing",
+      "type": "artifact",
+      "title": "Door-routing sequence — tunnel vs tailnet vs LAN-only surfaces",
+      "ref": "flows/door-routing-sequence.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.flow-panel-lifecycle",
+      "type": "artifact",
+      "title": "Panel lifecycle state machine — boot / online / offline / new boot id",
+      "ref": "flows/panel-lifecycle-state-machine.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.flow-replace-conflict",
+      "type": "artifact",
+      "title": "Replace-conflict sequence — cancel, wait ambient, start",
+      "ref": "flows/replace-conflict-sequence.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.impl-considerations",
+      "type": "artifact",
+      "title": "Implementation considerations — the constraint ledger and open decisions",
+      "ref": "implementation-considerations.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.load-model",
+      "type": "artifact",
+      "title": "Capacity model — 1 device, 2 users, poll rates, retention",
+      "ref": "capacity/load-model.md",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.state-layout",
+      "type": "artifact",
+      "title": "State layout — the two slots, gen, TTL and cadence inputs",
+      "ref": "data-architecture/state-layout.json",
+      "status": "accepted"
+    },
+    {
+      "id": "artifact.wireframes",
+      "type": "artifact",
+      "title": "Low-fidelity phone wireframes",
+      "ref": "ui/wireframes/remote-ui.excalidraw",
+      "status": "accepted"
+    },
+    {
+      "id": "contract.device-wire",
+      "type": "contract",
+      "title": "The shared board\u003c-\u003eserver HTTP contract (/device/poll, gen, applied_gen, next_poll_ms, TTL)",
+      "ref": "api/device-protocols.md",
+      "status": "accepted"
+    },
+    {
+      "id": "contract.openapi",
+      "type": "contract",
+      "title": "OpenAPI 3.1 for the service (all eight surfaces)",
+      "ref": "api/galactic-unicorn-remote-openapi.yaml",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.access-email-gate",
+      "type": "expectation",
+      "title": "Off-tailnet access is gated by Cloudflare Access on an allow-listed email with one-time PIN",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.access-is-perimeter",
+      "type": "expectation",
+      "title": "Cloudflare Access is the public perimeter and the only public-door authentication",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.audit-durable-row",
+      "type": "expectation",
+      "title": "Each command outcome is a durable append-only row with when, who, action and whether it landed",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.cancel-is-reset",
+      "type": "expectation",
+      "title": "Remote cancel is the D button — live in PROMPT/COUNTDOWN/HANDOFF, silent, a no-op in AMBIENT",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.ci-only-deploy",
+      "type": "expectation",
+      "title": "Deployments are CI-only; no manual deploy command is run",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.demand-driven-cadence",
+      "type": "expectation",
+      "title": "next_poll_ms is ~2 s on demand and ~5 s otherwise, driven by pending desired, countdown or viewer",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.desired-gen-monotonic",
+      "type": "expectation",
+      "title": "The server holds desired state with a monotonic gen counter",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.device-reports-observed",
+      "type": "expectation",
+      "title": "The device reports observed state, applied_gen and next_poll_ms on every poll",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.device-token-defence",
+      "type": "expectation",
+      "title": "The device token is LAN-only defence in depth, never a committed default",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.four-events-only",
+      "type": "expectation",
+      "title": "Exactly four events exist (bathtime, booktime, cleanup, reset); no fifth event is invented",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.gen-reseed",
+      "type": "expectation",
+      "title": "gen is re-seeded from applied_gen + 1 on a new boot id and pending desired is cleared",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.header-not-authz",
+      "type": "expectation",
+      "title": "Cf-Access-Authenticated-User-Email is never an authorisation input unless the JWT is verified",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.headless-timer",
+      "type": "expectation",
+      "title": "The server never computes remaining_s — it relays the board's own countdown (mirror, never a clock)",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.health-alignment",
+      "type": "expectation",
+      "title": "Dockerfile HEALTHCHECK, Homepage widget and CI image smoke all poll the same /health path",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.health-json",
+      "type": "expectation",
+      "title": "/health returns JSON with a status field on the path the healthcheck declares",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.image-smoke-gates-publish",
+      "type": "expectation",
+      "title": "The image smoke test polls the declared healthcheck and gates publish; a 404ing health endpoint fails the build",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.no-inbound-to-board",
+      "type": "expectation",
+      "title": "Nothing ever dials the board; every connection is outbound and the board has no inbound listener",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.no-new-panel-behaviour",
+      "type": "expectation",
+      "title": "The remote introduces no panel behaviour beyond the four existing button events",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.no-secret-logs",
+      "type": "expectation",
+      "title": "The device token, WiFi credentials, the Access JWT and any credential are never logged",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.offline-refusal",
+      "type": "expectation",
+      "title": "The server refuses to set desired state while the panel is offline",
+      "status": "partial"
+    },
+    {
+      "id": "expectation.one-program",
+      "type": "expectation",
+      "title": "The UI and the API are one adapter-node program — no separate frontend artefact, no separate API framework",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.panel-works-with-service-dead",
+      "type": "expectation",
+      "title": "Every button and every countdown on the panel is unchanged while the service is stopped",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.publish-0.0.0.0-3009",
+      "type": "expectation",
+      "title": "The container listens on 3000 and the host publishes 0.0.0.0:3009 on all interfaces",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.publish-main-amd64",
+      "type": "expectation",
+      "title": "Publish is main-only linux/amd64 from Doppler-resolved GHCR credentials",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.quality-gates",
+      "type": "expectation",
+      "title": "build, lint and vitest under coverage thresholds block merge and deploy",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.replace-sequence",
+      "type": "expectation",
+      "title": "Replace requests cancel, waits for state ambient, then requests start — never a silent switch",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.routine-inert-during-countdown",
+      "type": "expectation",
+      "title": "ROUTINE events are inert during COUNTDOWN — no silent switch, no lost countdown",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.routine-start-parity",
+      "type": "expectation",
+      "title": "A remote routine start produces the same tune and timing as a physical button press, and the phone can honestly say whether the panel did it",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.routines-single-source",
+      "type": "expectation",
+      "title": "Routine ids (cleanup) and labels (Cleanup) come from routines.json; symbol artwork is the only identity channel",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.same-ui-both-doors",
+      "type": "expectation",
+      "title": "The same UI is reachable on the tailnet with no auth in the way",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.sent-vs-done",
+      "type": "expectation",
+      "title": "The UI distinguishes a sent command from one the panel has applied, per applied_gen",
+      "status": "accepted"
+    },
+    {
+      "id": "expectation.ttl-drops-not-queues",
+      "type": "expectation",
+      "title": "Pending desired state expires (~45 s) and is dropped, never queued and fired late",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.audit-outcomes",
+      "type": "intent",
+      "title": "Every command's outcome is a durable append-only audit record",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.button-parity",
+      "type": "intent",
+      "title": "The remote adds no new panel behaviour — it is a second producer of the four button events",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.ci-delivery",
+      "type": "intent",
+      "title": "CI is Buildkite and deploys are CI-only — build, lint, test, image smoke gating publish, then Watchtower recreates the container",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.device-reconciliation",
+      "type": "intent",
+      "title": "The board polls the NAS; the server holds desired state with a monotonic gen and the board reports applied_gen and observed state",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.health-contract",
+      "type": "intent",
+      "title": "/health is a shared contract for the container HEALTHCHECK, the Homepage widget and the CI image-smoke step",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.honest-confirmation",
+      "type": "intent",
+      "title": "The UI must distinguish sent from the panel having done it",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.honest-failure",
+      "type": "intent",
+      "title": "A command during a network dead window fails visibly and never fires late",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.lan-reachability",
+      "type": "intent",
+      "title": "The container listens on 3000, published 0.0.0.0:3009 so the board's config.py literal can dial it",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.no-auto-resume",
+      "type": "intent",
+      "title": "No auto-resume after a panel reboot — a panel reboot cannot re-run the last command",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.panel-independence",
+      "type": "intent",
+      "title": "With this service stopped, every button and countdown on the panel is unchanged",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.public-door",
+      "type": "intent",
+      "title": "An off-tailnet phone gets the same ability through the Cloudflare Tunnel gated on an allow-listed email",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.remote-countdown-control",
+      "type": "intent",
+      "title": "Start and cancel the three household countdowns from a phone by mimicking the four panel buttons",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.replace-no-silent-switch",
+      "type": "intent",
+      "title": "Replace is a cancel-then-start sequence, never a silent switch",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.routines-sot",
+      "type": "intent",
+      "title": "routines.json is the single source of truth for routine ids and labels",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.server-owned-cadence",
+      "type": "intent",
+      "title": "The server owns poll cadence through next_poll_ms, driven by demand",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.single-program",
+      "type": "intent",
+      "title": "One SvelteKit 5 program on Node serves both the UI and the API",
+      "status": "accepted"
+    },
+    {
+      "id": "intent.two-door-security",
+      "type": "intent",
+      "title": "Two authentications for two doors — Cloudflare Access perimeter plus a LAN device token as defence in depth",
+      "status": "accepted"
+    },
+    {
+      "id": "job.audit-log-store",
+      "type": "job",
+      "title": "Append-only audit-log writer for command outcomes",
+      "status": "accepted"
+    },
+    {
+      "id": "job.browser-events",
+      "type": "job",
+      "title": "SSE GET /api/events stream plus the 2 s GET /api/state fallback",
+      "status": "accepted"
+    },
+    {
+      "id": "job.ci-pipeline",
+      "type": "job",
+      "title": "Buildkite pipeline with Dockerfile HEALTHCHECK, image smoke and GHCR publish",
+      "status": "accepted"
+    },
+    {
+      "id": "job.device-poll-endpoint",
+      "type": "job",
+      "title": "GET /device/poll handler implementing the shared device wire",
+      "status": "accepted"
+    },
+    {
+      "id": "job.health-endpoint",
+      "type": "job",
+      "title": "/health route returning JSON with a status field",
+      "status": "accepted"
+    },
+    {
+      "id": "job.public-door-guard",
+      "type": "job",
+      "title": "hooks.server.js surface-trust and routing guard — never route /device/*, never trust the identity header",
+      "status": "accepted"
+    },
+    {
+      "id": "job.reconcile-engine",
+      "type": "job",
+      "title": "Server-side reconcile logic — TTL, gen ordering, conflict policy, next_poll_ms",
+      "status": "accepted"
+    },
+    {
+      "id": "job.remote-ui",
+      "type": "job",
+      "title": "The phone UI — three routine symbols, one Cancel, and the honest sent/done states",
+      "status": "accepted"
+    },
+    {
+      "id": "job.sveltekit-service",
+      "type": "job",
+      "title": "SvelteKit 5 / Node (adapter-node) program serving the UI and the API",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.ci-gates",
+      "type": "verifier",
+      "title": "Buildkite build, lint and vitest with coverage thresholds on every push",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.coverage-threshold",
+      "type": "verifier",
+      "title": "Coverage thresholds (statements 80 / branches 50 / functions 80 / lines 80) enforced by npm test",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.deployment-review",
+      "type": "verifier",
+      "title": "Review that the published 0.0.0.0:3009:3000 mapping and shared /health path are aligned across Dockerfile, compose and CI",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.event-vocabulary",
+      "type": "verifier",
+      "title": "Assert the device vocabulary is exactly four events and that ROUTINE events are inert during COUNTDOWN",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.gen-reseed-test",
+      "type": "verifier",
+      "title": "Unit test the gen high-water mark both directions and re-seed from applied_gen + 1",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.health-smoke",
+      "type": "verifier",
+      "title": "Image smoke polls the declared healthcheck and gates publish",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.no-inbound-review",
+      "type": "verifier",
+      "title": "Design review of the component graph that nothing dials the board and the panel holds no dependency on the server",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.openapi-conformance",
+      "type": "verifier",
+      "title": "Check the OpenAPI 3.1 document matches the implemented surfaces and the one-program route set",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.panel-off-regression",
+      "type": "verifier",
+      "title": "Phase C regression test — the panel behaves perfectly with the service switched off",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.route-integration",
+      "type": "verifier",
+      "title": "curl-equivalent integration tests for /device/poll, /api/start, /api/replace, /api/state and /health",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.schema-lint",
+      "type": "verifier",
+      "title": "Check the audit-log schema and that routine ids/labels come only from routines.json",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.security-review",
+      "type": "verifier",
+      "title": "Review that the device token is LAN-only defence in depth, the identity header is never authorisation and no secret is logged",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.sse-tunnel",
+      "type": "verifier",
+      "title": "SSE and the 2 s fallback tested through the tunnel in Phase D, including the sent-vs-done states",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.surface-trust-review",
+      "type": "verifier",
+      "title": "Test and design review of tunnel-vs-tailnet surface trust, /device/* never routed, email as display/audit only",
+      "status": "accepted"
+    },
+    {
+      "id": "verifier.unit-reconcile",
+      "type": "verifier",
+      "title": "vitest unit tests for TTL, gen ordering both directions, conflict policy and next_poll_ms",
+      "status": "accepted"
+    }
+  ],
+  "edges": [
+    {
+      "from": "artifact.adr-0001-buildkite",
+      "to": "verifier.ci-gates",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.adr-0002-one-program",
+      "to": "verifier.openapi-conformance",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.adr-0003-lan-bind",
+      "to": "verifier.deployment-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.adr-0005-plaintext-http",
+      "to": "verifier.security-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.adr-0006-sse-fallback",
+      "to": "verifier.sse-tunnel",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.adr-0007-secrets-doppler",
+      "to": "verifier.security-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.audit-schema",
+      "to": "verifier.schema-lint",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.component-graph",
+      "to": "verifier.no-inbound-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.component-graph",
+      "to": "verifier.panel-off-regression",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.deployment-targets",
+      "to": "verifier.deployment-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.deployment-targets",
+      "to": "verifier.health-smoke",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.design-system",
+      "to": "verifier.sse-tunnel",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.domain-models",
+      "to": "verifier.event-vocabulary",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.domain-models",
+      "to": "verifier.route-integration",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.event-flow",
+      "to": "verifier.event-vocabulary",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.event-flow",
+      "to": "verifier.sse-tunnel",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.flow-device-state-machine",
+      "to": "verifier.event-vocabulary",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.flow-door-routing",
+      "to": "verifier.surface-trust-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.flow-panel-lifecycle",
+      "to": "verifier.gen-reseed-test",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.ci-gates",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.coverage-threshold",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.panel-off-regression",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.schema-lint",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.security-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.impl-considerations",
+      "to": "verifier.unit-reconcile",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.state-layout",
+      "to": "verifier.gen-reseed-test",
+      "type": "verified_by"
+    },
+    {
+      "from": "artifact.state-layout",
+      "to": "verifier.unit-reconcile",
+      "type": "verified_by"
+    },
+    {
+      "from": "intent.audit-outcomes",
+      "to": "expectation.audit-durable-row",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.button-parity",
+      "to": "expectation.no-new-panel-behaviour",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.button-parity",
+      "to": "expectation.routine-inert-during-countdown",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.ci-delivery",
+      "to": "expectation.ci-only-deploy",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.ci-delivery",
+      "to": "expectation.image-smoke-gates-publish",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.ci-delivery",
+      "to": "expectation.publish-main-amd64",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.ci-delivery",
+      "to": "expectation.quality-gates",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.device-reconciliation",
+      "to": "expectation.desired-gen-monotonic",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.device-reconciliation",
+      "to": "expectation.device-reports-observed",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.device-reconciliation",
+      "to": "expectation.headless-timer",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.health-contract",
+      "to": "expectation.health-alignment",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.health-contract",
+      "to": "expectation.health-json",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.honest-confirmation",
+      "to": "expectation.sent-vs-done",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.honest-failure",
+      "to": "expectation.offline-refusal",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.honest-failure",
+      "to": "expectation.ttl-drops-not-queues",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.lan-reachability",
+      "to": "expectation.publish-0.0.0.0-3009",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.no-auto-resume",
+      "to": "expectation.gen-reseed",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.panel-independence",
+      "to": "expectation.no-inbound-to-board",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.panel-independence",
+      "to": "expectation.panel-works-with-service-dead",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.public-door",
+      "to": "expectation.access-email-gate",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.public-door",
+      "to": "expectation.same-ui-both-doors",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.remote-countdown-control",
+      "to": "expectation.cancel-is-reset",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.remote-countdown-control",
+      "to": "expectation.four-events-only",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.remote-countdown-control",
+      "to": "expectation.routine-start-parity",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.replace-no-silent-switch",
+      "to": "expectation.replace-sequence",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.routines-sot",
+      "to": "expectation.routines-single-source",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.server-owned-cadence",
+      "to": "expectation.demand-driven-cadence",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.single-program",
+      "to": "expectation.one-program",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.two-door-security",
+      "to": "expectation.access-is-perimeter",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.two-door-security",
+      "to": "expectation.device-token-defence",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.two-door-security",
+      "to": "expectation.header-not-authz",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "intent.two-door-security",
+      "to": "expectation.no-secret-logs",
+      "type": "defines_success_for"
+    },
+    {
+      "from": "job.audit-log-store",
+      "to": "artifact.audit-schema",
+      "type": "consumes"
+    },
+    {
+      "from": "job.audit-log-store",
+      "to": "artifact.event-flow",
+      "type": "consumes"
+    },
+    {
+      "from": "job.audit-log-store",
+      "to": "verifier.schema-lint",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.browser-events",
+      "to": "artifact.adr-0006-sse-fallback",
+      "type": "consumes"
+    },
+    {
+      "from": "job.browser-events",
+      "to": "artifact.domain-models",
+      "type": "consumes"
+    },
+    {
+      "from": "job.browser-events",
+      "to": "artifact.event-flow",
+      "type": "consumes"
+    },
+    {
+      "from": "job.browser-events",
+      "to": "verifier.sse-tunnel",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "artifact.adr-0001-buildkite",
+      "type": "consumes"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "artifact.adr-0004-ci-only-deploy",
+      "type": "consumes"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "artifact.adr-0007-secrets-doppler",
+      "type": "consumes"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "artifact.deployment-targets",
+      "type": "consumes"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "verifier.ci-gates",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "verifier.coverage-threshold",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "verifier.deployment-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.ci-pipeline",
+      "to": "verifier.health-smoke",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.device-poll-endpoint",
+      "to": "artifact.domain-models",
+      "type": "consumes"
+    },
+    {
+      "from": "job.device-poll-endpoint",
+      "to": "artifact.flow-device-state-machine",
+      "type": "consumes"
+    },
+    {
+      "from": "job.device-poll-endpoint",
+      "to": "contract.device-wire",
+      "type": "consumes"
+    },
+    {
+      "from": "job.device-poll-endpoint",
+      "to": "verifier.route-integration",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.health-endpoint",
+      "to": "artifact.deployment-targets",
+      "type": "consumes"
+    },
+    {
+      "from": "job.health-endpoint",
+      "to": "verifier.route-integration",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.public-door-guard",
+      "to": "artifact.adr-0005-plaintext-http",
+      "type": "consumes"
+    },
+    {
+      "from": "job.public-door-guard",
+      "to": "artifact.flow-door-routing",
+      "type": "consumes"
+    },
+    {
+      "from": "job.public-door-guard",
+      "to": "verifier.security-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.public-door-guard",
+      "to": "verifier.surface-trust-review",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "artifact.domain-models",
+      "type": "consumes"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "artifact.flow-command-round-trip",
+      "type": "consumes"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "artifact.flow-replace-conflict",
+      "type": "consumes"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "artifact.impl-considerations",
+      "type": "consumes"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "artifact.state-layout",
+      "type": "consumes"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "verifier.gen-reseed-test",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.reconcile-engine",
+      "to": "verifier.unit-reconcile",
+      "type": "verified_by"
+    },
+    {
+      "from": "job.remote-ui",
+      "to": "artifact.design-system",
+      "type": "consumes"
+    },
+    {
+      "from": "job.remote-ui",
+      "to": "artifact.event-flow",
+      "type": "consumes"
+    },
+    {
+      "from": "job.remote-ui",
+      "to": "artifact.flow-command-round-trip",
+      "type": "consumes"
+    },
+    {
+      "from": "job.remote-ui",
+      "to": "artifact.wireframes",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "artifact.adr-0002-one-program",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "artifact.adr-0003-lan-bind",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "artifact.component-graph",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "artifact.load-model",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "contract.openapi",
+      "type": "consumes"
+    },
+    {
+      "from": "job.sveltekit-service",
+      "to": "verifier.openapi-conformance",
+      "type": "verified_by"
+    },
+    {
+      "from": "verifier.ci-gates",
+      "to": "expectation.ci-only-deploy",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.ci-gates",
+      "to": "expectation.one-program",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.ci-gates",
+      "to": "expectation.publish-main-amd64",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.ci-gates",
+      "to": "expectation.quality-gates",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.coverage-threshold",
+      "to": "expectation.quality-gates",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.deployment-review",
+      "to": "expectation.health-alignment",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.deployment-review",
+      "to": "expectation.publish-0.0.0.0-3009",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.event-vocabulary",
+      "to": "expectation.four-events-only",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.event-vocabulary",
+      "to": "expectation.no-new-panel-behaviour",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.event-vocabulary",
+      "to": "expectation.routine-inert-during-countdown",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.event-vocabulary",
+      "to": "expectation.routines-single-source",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.gen-reseed-test",
+      "to": "expectation.desired-gen-monotonic",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.gen-reseed-test",
+      "to": "expectation.gen-reseed",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.health-smoke",
+      "to": "expectation.health-alignment",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.health-smoke",
+      "to": "expectation.health-json",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.health-smoke",
+      "to": "expectation.image-smoke-gates-publish",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.no-inbound-review",
+      "to": "expectation.headless-timer",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.no-inbound-review",
+      "to": "expectation.no-inbound-to-board",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.openapi-conformance",
+      "to": "expectation.one-program",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.panel-off-regression",
+      "to": "expectation.panel-works-with-service-dead",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.cancel-is-reset",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.device-reports-observed",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.device-token-defence",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.health-json",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.replace-sequence",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.routine-start-parity",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.route-integration",
+      "to": "expectation.sent-vs-done",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.schema-lint",
+      "to": "expectation.audit-durable-row",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.schema-lint",
+      "to": "expectation.routines-single-source",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.security-review",
+      "to": "expectation.device-token-defence",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.security-review",
+      "to": "expectation.header-not-authz",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.security-review",
+      "to": "expectation.no-secret-logs",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.sse-tunnel",
+      "to": "expectation.routine-start-parity",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.sse-tunnel",
+      "to": "expectation.sent-vs-done",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.surface-trust-review",
+      "to": "expectation.access-email-gate",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.surface-trust-review",
+      "to": "expectation.access-is-perimeter",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.surface-trust-review",
+      "to": "expectation.header-not-authz",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.surface-trust-review",
+      "to": "expectation.same-ui-both-doors",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.demand-driven-cadence",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.desired-gen-monotonic",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.headless-timer",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.offline-refusal",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.replace-sequence",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.routine-inert-during-countdown",
+      "type": "verifies"
+    },
+    {
+      "from": "verifier.unit-reconcile",
+      "to": "expectation.ttl-drops-not-queues",
+      "type": "verifies"
+    }
+  ]
+}
