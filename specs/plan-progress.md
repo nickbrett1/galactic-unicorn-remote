@@ -279,3 +279,22 @@ so the audit log stays dev-local.
 
 Caveat: `docker` is not installed in the devcontainer, so I3/I6 read the compose file rather than a
 `docker compose config` resolve.
+
+## Phase 5 — Validation, the two agent steps (2026-09-25)
+
+**V1 — CI/quality gates.** Build **19** (`0fbf3bb`, the first to carry the Phase 4 audit fix and its
+regression test) is green end to end: `build` (install → build → lint → `CI=true npm test`) → `docker_smoke`
+→ `docker_publish`. Publish is `main`-only and `linux/amd64`, and it resolved `GHCR_UPDATE_TOKEN` from
+Doppler `common/prd` rather than the agent's environment hook.
+
+**V2 — the image smoke gates publish.** Verified structurally: `docker_publish` declares
+`depends_on: [build, docker_smoke]`, and the smoke step polls the image's **declared** healthcheck, treating
+both "not healthy after 30 attempts" and "container exited" as `exit 1` (dumping its logs, so an exit is never
+mistaken for a slow start). A container that 404s `/health` therefore cannot reach the push.
+The negative case was **not** executed: this devcontainer has no `docker`, so the gate is confirmed by its
+wiring and its pass/fail branches rather than by a deliberately broken image. Running that once on a host with
+Docker is a cheap, worthwhile follow-up.
+
+**Still open in Phase 5:** V3–V7 are `[MANUAL]` and need the NAS and the physical panel. **V4 (the critical
+regression — the panel is unchanged with the service dead) is the one that matters**, and it can be run today
+even though Phase C is unbuilt. V5/V6 need the firmware. V8 is the deferred polish/hold list.
