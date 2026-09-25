@@ -230,3 +230,52 @@ served by something else entirely, and the only reliable check is what the *orig
 **not** a read of the app's Session Duration — it is minted per unauthenticated hit to carry the login
 flow. The earlier note in this file treating it as the setting was wrong; the post-login cookie is the one
 to read.
+
+## Phase 4 — Integration (2026-09-24)
+
+Run against a live dev server with `scripts/fake-board.sh` driving `/device/poll`. **One real defect found and
+fixed** (I1); the rest verified.
+
+**I1 — fake-board end-to-end.** The round trip reproduces the spec's flows. Audit trail from one run, in order:
+
+- `accepted → applied` — `start bathtime` (202, `gen:2`) then `applied` on the next poll, `detail: "board reported applied_gen >= gen"`.
+- `noop` — `start bathtime` again while it counts down → **200** `{"status":"noop","reason":"already_running"}`.
+- `conflict` — `start cleanup` mid-bathtime → **409** `{"error":"conflict","current_routine":"bathtime","offers":["replace"]}`. Never a silent switch.
+- `replace` — **202**, and the log shows it as a two-phase sequence driven by *reported* state, not a timer:
+  `cancel … applied ("replace: cancel landed")` → `replace … accepted ("replace: starting target routine")`. The board went countdown-bathtime → ambient → countdown-cleanup.
+- `expired` — TTL elapse with the board away: `accepted`, then `expired` (`"desired TTL elapsed with no applied_gen advance"`). **Dropped, never queued, never fired late** (§5.4).
+- `refused_offline` — a command with `last_seen_s: 71` → **503** `{"error":"panel_offline"}`, and nothing was written (§5.5).
+- boot change — logged as `action: boot, detail: "boot id changed … -> …"`, which is the informal panel-health monitor (§5.6).
+
+**The defect: a reboot discarded a pending command with no row.** The boot-change branch runs *before* the
+apply/expire checks, so a command accepted just before the panel rebooted was cleared leaving only the `boot`
+row. The phone would say "the panel didn't answer" while the audit log implied nothing had ever been asked —
+precisely the argument §9.1 exists to prevent, and the one thing the log is meant to settle. Both slots
+(desired and an in-flight replace) are now closed out as `expired` before they are cleared
+(`src/routes/device/poll/+server.js`), with a regression test. Verified live: `accepted → expired
+("discarded: panel rebooted before the command landed") → boot`. The plain TTL path was already correct.
+
+**I2 — OpenAPI conformance.** Exactly the eight declared surfaces, no more and no fewer: `/`, `/api/state`,
+`/api/events`, `/api/start`, `/api/cancel`, `/api/replace`, `/device/poll`, `/health` — declared set and
+implemented set are identical in both directions (`verifier.openapi-conformance`).
+
+**I3 — deployment contract.** `0.0.0.0:3009:3000` present in `docker-compose.yml`; the Dockerfile
+`HEALTHCHECK` fetches `127.0.0.1:3000/health`; the Homepage widget polls `localhost:3009/health`; the CI smoke
+step polls the **declared** healthcheck (`docker inspect .State.Health`), so all four agree on `/health` and
+the smoke step still gates publish (`expectation.health-alignment`).
+
+**I4 — no-inbound review.** In `spec/topology/component-graph.mmd` exactly one edge touches the board and it
+points **from** it: `board -- "outbound HTTP GET ~2s/5s, plaintext, LAN only" --> DEV`. Nothing dials the panel.
+
+**I5 — security review.** A token-string scan of the audit log and the server/board logs finds nothing — the
+token is compared on `/device/poll` and never echoed. `door` is threaded into the command path **only** to fill
+the audit row (`mapDoor`); no branch reads it, so the identity header grants nothing (§8.3, O7 deferral intact).
+
+**I6 — single container.** One service (`app`), no `replicas`/`deploy` key — two replicas would each hold their
+own `gen` (R20).
+
+**I7 — repo hygiene.** The only tracked dotenv file is `.env.example`; `.env`, `.env.*` and `data/` are ignored,
+so the audit log stays dev-local.
+
+Caveat: `docker` is not installed in the devcontainer, so I3/I6 read the compose file rather than a
+`docker compose config` resolve.
