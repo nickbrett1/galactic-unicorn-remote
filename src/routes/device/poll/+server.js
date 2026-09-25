@@ -164,6 +164,35 @@ export function GET({ url }) {
   // (1) A new boot id clears pending desired BEFORE this poll's response is
   // computed — the panel must never re-run the last command after a reboot (§3.2).
   if (previousBoot !== undefined && previousBoot !== report.boot) {
+    // A pending command dies here, and that is by design (§3.2) — but it must
+    // not die *silently*. This branch runs before the apply/expire checks below,
+    // so without an explicit row the command would vanish leaving only the boot
+    // row: the phone would say "the panel didn't answer" while the log implied
+    // nothing was ever asked. §9.1's whole point is that "it didn't work"
+    // becomes a record rather than an argument, so both slots are closed out
+    // here, as `expired`, before they are cleared.
+    const discarded = getDesired();
+    if (discarded && discarded.action !== "none") {
+      auditDevice({
+        action: discarded.action,
+        outcome: "expired",
+        routine: discarded.routine ?? null,
+        gen: discarded.gen,
+        nowS,
+        detail: "discarded: panel rebooted before the command landed",
+      });
+    }
+    const abandoned = getReplaceSequence();
+    if (abandoned) {
+      auditDevice({
+        action: "replace",
+        outcome: "expired",
+        routine: abandoned.target_routine,
+        gen: abandoned.cancelled_gen,
+        nowS,
+        detail: "replace abandoned: panel rebooted mid-sequence",
+      });
+    }
     clearDesired();
     clearReplaceSequence();
     auditDevice({

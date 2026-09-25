@@ -545,4 +545,28 @@ describe("audit trail", () => {
     expect(applied).toBeTruthy();
     expect(applied.applied_gen).toBeGreaterThanOrEqual(applied.gen);
   });
+
+  it("records a pending command as expired when a reboot discards it (§3.2 + §9.1)", async () => {
+    const { readAuditLog } = await import("../src/lib/server/audit.js");
+    resetState();
+    poll({ url: pollUrl({ boot: "b1" }) });
+    await post(postStart, { routine: "bathtime" });
+    const gen = getGen();
+    const before = readAuditLog().length;
+
+    // The board returns on a NEW boot id, well inside the TTL, so the reboot
+    // branch — not the TTL branch — is what discards the command.
+    await poll({ url: pollUrl({ boot: "b2" }) });
+
+    expect(getDesired()).toBeNull();
+    // Only the rows this scenario appended: the log is shared across cases.
+    const rows = readAuditLog().slice(before);
+    const discarded = rows.find((r) => r.outcome === "expired");
+    // The boot row alone would leave the command unaccounted for.
+    expect(discarded).toBeTruthy();
+    expect(discarded.action).toBe("start");
+    expect(discarded.gen).toBe(gen);
+    expect(discarded.detail).toMatch(/reboot/i);
+    expect(rows.at(-1).action).toBe("boot");
+  });
 });
