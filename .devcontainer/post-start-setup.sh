@@ -30,3 +30,10 @@ fi
 
 
 echo "INFO: Services check/startup complete."
+
+echo "INFO: Checking the container agent..."
+if [ -x "/workspaces/galactic-unicorn-remote/scripts/agent-dev.sh" ]; then
+    "/workspaces/galactic-unicorn-remote/scripts/agent-dev.sh" start || true
+else
+    echo "WARN: scripts/agent-dev.sh not found, skipping the container agent"
+fi
