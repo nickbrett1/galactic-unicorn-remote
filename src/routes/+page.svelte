@@ -280,34 +280,8 @@
 </main>
 
 <style>
-  :global(:root) {
-    --c-bg: #0b0e0d;
-    --c-surface: #171b1a;
-    --c-text: #eef3f0;
-    --c-muted: #a7b1ac;
-    --c-go: #34c96a;
-    --c-go-dim: #35995b;
-    --c-warn: #f0b429;
-    --c-danger: #e2453a;
-    --c-on: #08100b;
-    --radius: 12px;
-    --space-1: 8px;
-    --space-2: 16px;
-    --tap-min: 56px;
-    color-scheme: dark;
-  }
-
-  :global(body) {
-    margin: 0;
-    background: var(--c-bg);
-    color: var(--c-text);
-    font-family:
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      Roboto,
-      sans-serif;
-  }
+  /* Tokens and the base body live in `src/app.css` (loaded by `+layout.svelte`)
+     so the read-only tile at `/tile` shares them — `design-system.md` §2. */
 
   .remote {
     box-sizing: border-box;

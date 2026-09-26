@@ -130,3 +130,22 @@ Settings, durations, `+2 min`, history browsers, multi-panel selection, privileg
 surfaces, theming, sound (the phone is silent by design — cancel stays silent on the panel, and the
 phone carries the acknowledgement, memo §11.13; a phone that beeped in a nursery would be its own
 bug).
+
+## 9. The glanceable tile (`/tile`) — read-only
+
+The household dashboard (Homepage on the NAS) embeds the panel's state as a small tile. It is served by
+this same service, at `/tile`, so the tile and the drill-in share **one origin, one palette and one set of
+formatters** — the tile is the mirror of §3 with the controls removed.
+
+- **Read-only by construction.** It has **no buttons** — the "exactly four controls" rule (§1) holds on `/`,
+  and `/tile` is the one surface where *nothing* is a button. Controls live behind the click-through to `/`.
+- **Same wording as the remote.** Headline, countdown and state word all come from `$lib/ui/format.js`, so the
+  tile can only ever say what the remote says. Routine labels and artwork come from the catalogue on `data`;
+  nothing is hard-coded (§2).
+- **Liveness is still shown** (§5): the tile carries the "panel: last seen …" heartbeat with the same green/red
+  dot, so a stale mirror is visible without a click.
+- **The three routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
+  the same symbol language as the buttons, with no affordance to press.
+- **Not an API surface.** `/tile` is a page; the sealed eight-endpoint API set (memo §6, OpenAPI) is unchanged.
+- The tokens for both surfaces live in `src/app.css` (loaded by `+layout.svelte`), which is what
+  `tests/ui-lint.test.js` reads for the WCAG AA contrast check.

@@ -298,3 +298,31 @@ Docker is a cheap, worthwhile follow-up.
 **Still open in Phase 5:** V3–V7 are `[MANUAL]` and need the NAS and the physical panel. **V4 (the critical
 regression — the panel is unchanged with the service dead) is the one that matters**, and it can be run today
 even though Phase C is unbuilt. V5/V6 need the firmware. V8 is the deferred polish/hold list.
+
+## Side addition — the Homepage tile (`/tile`) and the NAS dashboard entry (2026-09-26)
+
+Not a phase from `plan.md`: a household-dashboard affordance requested once the panel was polling live.
+
+**Service — read-only tile.** New page `/tile` (`src/routes/tile/+page.server.js`, `+page.svelte`): the §3
+mirror with the controls removed — headline + interpolated countdown + state word + the "panel: last seen …"
+heartbeat + the three routine caps as inert chips. Wording comes only from `$lib/ui/format.js`, labels/artwork
+only from `routines.json`. It is a **page, not an endpoint** — the sealed eight-endpoint API set is unchanged.
+The palette tokens moved from `+page.svelte` into `src/app.css` (loaded once by `+layout.svelte`) so both
+surfaces share one source; `tests/ui-lint.test.js` now reads `src/app.css` for the contrast check.
+Documented in `specs/spec/ui/design-system.md` §9.
+
+Gates (last run): `npm run build` pass · `npm run check` 0/0 · `npm run lint` 0 errors (23 warnings, the
+usual sonarjs/security) · `npx vitest run --coverage` **31 files/… all green**, coverage stmts 94.13 / branch
+85.8 / funcs 92.21 / lines 95.13 (gates 80/50/80/80). New `tests/ui-tile.test.js` (6 tests) pins "no controls",
+the countdown-only-while-counting rule, the single active chip, and the SSE follow.
+
+**NAS — Homepage (`services.yaml`, applied by the nas-goose A2A agent).** A `Galactic Unicorn` tile now sits
+in the **Activity** group, in alphabetical order between DeepSeek Balance and GitHub Weekly; `href` is
+`https://home-display.fintechnick.com` (the drill-in). Backups on the NAS: `services.yaml.bak.<ts>` (pre-edit)
+and `services.yaml.bak2.<ts>` (pre-reorder). Note: a **second** tile still appears under **Services** — that
+one is Docker auto-discovery from the container's `homepage.group` labels, not `services.yaml`; removing it
+means editing the NAS compose labels (open).
+
+**Liveness snapshot at the time (proof Phase C works).** `/api/state` from the NAS:
+`panel {boot 3c7d31ff, fw 0.1.27, state ambient, online true, last_seen_s 1, threshold_s 15}`; cadence
+interlock confirmed earlier (a live `curl -N /api/events` subscriber dropped `last_seen_s` from ~19 to 1).

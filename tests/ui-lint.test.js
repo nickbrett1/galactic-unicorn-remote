@@ -97,9 +97,14 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Pull the `--c-*` tokens out of the page's stylesheet. */
+/**
+ * Pull the `--c-*` tokens out of the global stylesheet.
+ *
+ * The tokens live in `src/app.css` (loaded once by `+layout.svelte`) so both
+ * surfaces share one palette (`design-system.md` §2).
+ */
 function tokens() {
-  const page = readFileSync(join(root, "src/routes/+page.svelte"), "utf8");
+  const page = readFileSync(join(root, "src/app.css"), "utf8");
   const found = {};
   for (const [, name, hex] of page.matchAll(
     /(--c-[a-z-]+):\s*(#[0-9a-fA-F]{6})/g,

@@ -1,0 +1,37 @@
+/*
+ * Global design tokens — the house palette (`spec/ui/design-system.md` §2).
+ *
+ * Lives here, not in a component, so every surface (the remote at `/` and the
+ * read-only tile at `/tile`) paints from one source. `tests/ui-lint.test.js`
+ * reads this file to assert WCAG 2.1 AA contrast on the dark palette, so the
+ * `--c-*` tokens must stay in `:root` below.
+ */
+
+:root {
+  --c-bg: #0b0e0d;
+  --c-surface: #171b1a;
+  --c-text: #eef3f0;
+  --c-muted: #a7b1ac;
+  --c-go: #34c96a;
+  --c-go-dim: #35995b;
+  --c-warn: #f0b429;
+  --c-danger: #e2453a;
+  --c-on: #08100b;
+  --radius: 12px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --tap-min: 56px;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
