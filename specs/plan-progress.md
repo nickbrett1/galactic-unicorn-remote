@@ -317,11 +317,13 @@ usual sonarjs/security) · `npx vitest run --coverage` **31 files/… all green*
 the countdown-only-while-counting rule, the single active chip, and the SSE follow.
 
 **NAS — Homepage (`services.yaml`, applied by the nas-goose A2A agent).** A `Galactic Unicorn` tile now sits
-in the **Activity** group, in alphabetical order between DeepSeek Balance and GitHub Weekly; `href` is
-`https://home-display.fintechnick.com` (the drill-in). Backups on the NAS: `services.yaml.bak.<ts>` (pre-edit)
-and `services.yaml.bak2.<ts>` (pre-reorder). Note: a **second** tile still appears under **Services** — that
-one is Docker auto-discovery from the container's `homepage.group` labels, not `services.yaml`; removing it
-means editing the NAS compose labels (open).
+in the **Activity** group, in alphabetical order (DeepSeek Balance · **Galactic Unicorn** · GitHub Weekly ·
+Network Health · Top MCP Tools): `href` is `https://home-display.fintechnick.com` (the drill-in) and the widget
+is an **iframe of `http://nas:3009/tile`** — the DeepSeek-Balance pattern, so the tile paints the live mirror
+in the house palette rather than a raw field list. A second, health-only tile under **Services** came from
+Docker auto-discovery; the `homepage.*` labels were removed from **both** the NAS compose and this repo's
+`docker-compose.yml`, so the duplicate is gone. NAS backups: `services.yaml.bak{,2,3}.<ts>`. Repo: PRs #1
+(`/tile`) and #2 (compose labels + `deploy/homepage-services.yaml`).
 
 **Liveness snapshot at the time (proof Phase C works).** `/api/state` from the NAS:
 `panel {boot 3c7d31ff, fw 0.1.27, state ambient, online true, last_seen_s 1, threshold_s 15}`; cadence
