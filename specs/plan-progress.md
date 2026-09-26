@@ -11,8 +11,8 @@ Lightweight progress record. Authority: `specs/plan.md`, `specs/spec/implementat
 | **Phase A — The Door** | **`[MANUAL]` — NOT DONE** | NAS/Cloudflare infra; out of this run's scope |
 | **Phase 2 — Backend (B1–B9)** | **DONE (this run)** | see below |
 | Phase 3 — Client / UI (D1–D5) | **DONE (this run)** — D4 `[MANUAL]` pending | see below |
-| Phase 4 — Integration | not started | |
-| Phase 5 — Validation (E) | not started | |
+| Phase 4 — Integration | **DONE (this run)** | see below |
+| Phase 5 — Validation (E) | **V1/V2 done, V4 PASSED**; V3/V5–V7 `[MANUAL]` | see below |
 | Phase C — Firmware | separate repo | out of scope |
 
 ## Phase 2 — Backend (B1–B9)
@@ -295,9 +295,38 @@ The negative case was **not** executed: this devcontainer has no `docker`, so th
 wiring and its pass/fail branches rather than by a deliberately broken image. Running that once on a host with
 Docker is a cheap, worthwhile follow-up.
 
-**Still open in Phase 5:** V3–V7 are `[MANUAL]` and need the NAS and the physical panel. **V4 (the critical
-regression — the panel is unchanged with the service dead) is the one that matters**, and it can be run today
-even though Phase C is unbuilt. V5/V6 need the firmware. V8 is the deferred polish/hold list.
+**V4 — the critical regression: the panel is unchanged with the service dead — PASSED (2026-09-26).**
+
+The earlier note that "V4 can be run today even though Phase C is unbuilt" was true but hollow: no board had ever
+polled (boot `null`, `applied_gen 0`), so stopping the service *could not* have changed the panel. Phase C now
+polls — the board is in the loop — so this is the **real** V4.
+
+Run, in order, driven by the nas-goose A2A agent (all panel work `[MANUAL]`, by the operator):
+
+- **Baseline** (16:12:03Z): `boot 3f7c646d`, `fw 0.1.27`, `state ambient`, `online true`, `applied_gen 0`.
+- **Stop**: `docker stop galactic-unicorn-remote` → `Exited (0)`; NAS-side `GET /health` → `000` (dead).
+- **Operator sequence on the panel**: each routine cap pressed in turn (each started its countdown normally);
+  the other two caps inert while one counted down; the silent cancel cancelled immediately; one countdown ran to
+  HANDOFF and returned to ambient.
+- **Finding**: "a slight freeze during the countdown" — not a hard hang, and it recovered on its own. So the
+  panel was **fully usable with the service dead**, which is the expectation; the freeze is recorded as an
+  observation, not a failure.
+- **Restart**: `docker start` → `Up`, `health_from_nas=200`; `boot` still `3f7c646d` and `uptime_s` had kept
+  counting (**the board never rebooted** — it rode the outage, as designed), `last_seen_s 1`, `applied_gen 0`,
+  `state ambient`. No late action fired after the service returned.
+
+What V4 proves: the physical controls and the countdown are **board-local**; the server is not in the control
+path, so its death changes nothing the child touches. It is the invariant the whole reconciliation design rests
+on — the board is willing to be *told*, never *dependent*.
+
+Caveat to chase: the "slight freeze". Hypothesis (unverified) — the poll's synchronous socket read and the
+`gc.collect()` before each request block the display loop while the request is in flight, and the effect is more
+visible when the target is unreachable. Worth a look in the firmware's `lib/remote.py` (e.g. bound the read,
+feed the WDT, avoid GC on the countdown path). Not a regression; a follow-up.
+
+**Still open in Phase 5:** V3, V5 (phone start ≡ physical press), V6 (dead-window honesty — never fires late),
+V7 are `[MANUAL]` and need the panel; V5/V6 are now runnable because the board polls. V8 is the deferred
+polish/hold list, and V2's negative case still wants one run on a host with Docker.
 
 ## Side addition — the Homepage tile (`/tile`) and the NAS dashboard entry (2026-09-26)
 
