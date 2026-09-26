@@ -64,6 +64,28 @@ export const config = Object.freeze({
   nextPollMaxMs: readNumber("NEXT_POLL_MAX_MS", 10000),
   /** O1 — append-only JSONL audit log destination. */
   auditLogPath: process.env.AUDIT_LOG_PATH ?? "data/audit.jsonl",
+  /**
+   * Where `/firmware/*` mirrors from. The board cannot do TLS (the 2026-09-26
+   * root-cause memo), so the service fetches the release over HTTPS on its
+   * behalf. `releases/latest/download` is the one URL that needs no version —
+   * the same property the firmware relied on when it fetched GitHub itself.
+   */
+  firmwareUpstreamBase:
+    process.env.FIRMWARE_UPSTREAM_BASE ??
+    "https://github.com/nickbrett1/galactic-unicorn/releases/latest/download",
+  /**
+   * How long a fetched manifest is trusted before it is re-fetched. The board
+   * checks every ~15 minutes, so this only bounds how quickly a new release
+   * becomes visible to it; the pack itself is cached by sha256, so a release
+   * costs exactly one upstream download. Default 300 s.
+   */
+  firmwareCacheTtlS: readNumber("FIRMWARE_CACHE_TTL_S", 300),
+  /**
+   * When set, serve the firmware artifacts from this directory instead of
+   * mirroring upstream (the operator escape hatch — "the service serves and
+   * packs"). Empty (the default) means mirror the release.
+   */
+  firmwareLocalDir: process.env.FIRMWARE_LOCAL_DIR ?? "",
   /** True for development/test; false in any production run. */
   isDevOrTest,
 });

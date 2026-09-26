@@ -256,6 +256,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /firmware/{file}:
+    get:
+      tags: [device]
+      summary: The board's firmware update channel
+      description: >
+        **Adjacent to the device protocol, not part of it.** The board does not poll this path; it
+        fetches it on its own slow (~15 min) timer. It exists because the board **cannot complete a
+        TLS handshake** (measured 2026-09-26: DNS and `TCP:443` fine and plain HTTP works, but every
+        HTTPS attempt fails instantly as `OSError(12,)` or blocks past the hardware watchdog and
+        hard-resets the panel). The service, which has a working TLS stack, fetches the release over
+        HTTPS on the board's behalf and serves `manifest.json` and the pack over **plain HTTP**.
+
+        `{file}` is one of two names: `manifest.json`, or the `*.pack` the manifest describes. A
+        4-byte-checked shape guard rejects anything else with `404` before any upstream fetch. The
+        manifest still carries a sha256 for the pack (and one per file); the pack is verified against
+        it here **and** on the board, so a corrupted mirror is a `502`, never a `200` the board
+        discovers is wrong after downloading it. `cache-control: no-store`: the board has no cache and
+        must always see the current release.
+
+        **No token.** The firmware artifacts are public on GitHub today and the board's update path
+        has never carried a credential; exposure here is the same as the public release it mirrors.
+        LAN-only in intent, exactly like `/device/poll`: reached at
+        `http://192.168.1.2:3009/firmware/*` and **not routed by the tunnel**. The board's
+        `config.UPDATE_MANIFEST_URL` points here. The existing route is
+        `src/routes/firmware/[file]/+server.js`; the reasoning is in `src/lib/server/firmware.js`.
+      parameters:
+        - name: file
+          in: path
+          required: true
+          description: The artifact name — `manifest.json` or the `*.pack` the manifest names.
+          schema: { type: string, pattern: "^([A-Za-z0-9._-]+\\.pack|manifest\\.json)$" }
+      responses:
+        "200":
+          description: The artifact, over plain HTTP.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, pack]
+                properties:
+                  version: { type: string }
+                  pack:
+                    type: object
+                    required: [file, sha256]
+                    properties:
+                      file: { type: string }
+                      sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404":
+          description: Not one of the two artifact names, or a pack the manifest does not describe.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: >
+            Upstream unreachable with nothing cached, or a pack that failed its sha256. The board
+            keeps its current firmware and retries on its next check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /health:
     get:
       tags: [ops]

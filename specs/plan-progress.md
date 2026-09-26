@@ -456,3 +456,86 @@ no listen, no webREPL), and the server has **no** channel to nudge an update: th
 is `{gen, next_poll_ms, action, routine, expires_at}` and `DESIRED_ACTIONS` is closed. The server can *defer* a
 check, never bring one forward. Next attempt ≈17:31; if it does not land, the options are a power-cycle (which
 re-runs `boot.py`'s update check) or plugging in USB to read `update.log` — there is no remote way in.
+
+## The OTA failure, diagnosed — the board cannot do TLS (2026-09-26/27)
+
+The 15-minute retries above kept failing, so the board was plugged back into the Mac and probed
+directly over the serial REPL. The result is not a bug in the retry logic, a bad manifest, or a
+heap problem. It is one measured fact:
+
+> **This board cannot complete a TLS handshake.**
+
+What was measured, from the board itself (v0.1.28-era code, `fw 0.1.27`):
+
+| Probe | Result |
+|---|---|
+| `getaddrinfo("github.com")` | ok — `140.82.112.3` in 17 ms |
+| `TCP :443` connect | ok — 16 ms |
+| LAN plain HTTP (`192.168.1.2:3009/health`) | ok |
+| Internet plain HTTP (`http://example.com`) | ok — 559 B / 95 ms |
+| **every HTTPS attempt** | **fails instantly as `OSError(12,)` in ~51 ms, or blocks past the 8 s watchdog and hard-resets (`reset_cause=3`)** |
+| heap | not the cause — ~25 KB TLS buffers allocate fine, 64 KB contiguous allocates |
+
+The board's own `update.log` (89,282 bytes, read over USB) is consistent: **zero** occurrences of the
+then-latest version, and **103** occurrences of `no update: 0.1.27 is already running`. It had never
+once read a manifest, because it could never get far enough to read one. `lib/net.py`'s
+`classify_failure` also mislabels the instant `OSError(12,)` as `heap` — worth fixing for the record,
+but a side issue.
+
+Two aggravators compounded it and are now fixed too:
+
+1. **`machine.WDT(timeout=30000)` was never honoured** — the fuse fires under 11 s regardless. So
+   `NETWORK_TIMEOUT_MS = 30000` was a fiction: any check slower than ~8 s was a *reboot*, not a
+   deferred check.
+2. **`BOOT_WIFI_ATTEMPTS = 1`** lost the coin-flip boot join.
+
+### The fix, all three parts
+
+**FIX 2 (the structural one) — take TLS out of the board's update path.** Stop making the one device
+that cannot do TLS the device that must. The **service** fetches the release over HTTPS on the board's
+behalf and serves it over plain HTTP:
+
+- Service: **new** `src/lib/server/firmware.js` (mirror + cache + sha256 verification) and
+  `src/routes/firmware/[file]/+server.js` (`GET /firmware/{file}`), plus `config.js` /
+  `.env.example` keys `FIRMWARE_UPSTREAM_BASE` (default `releases/latest/download`),
+  `FIRMWARE_CACHE_TTL_S` (300) and `FIRMWARE_LOCAL_DIR` (the "serve and pack from disk" escape hatch).
+- Firmware: `config.UPDATE_MANIFEST_URL` → `http://192.168.1.2:3009/firmware/manifest.json`, and a new
+  `UPDATE_TIMEOUT_S = 3` that bounds **every** socket op of a fetch.
+
+The trust story is unchanged, which is the point: the manifest still carries the pack sha256 (and one
+per file), the service refuses to serve bytes that do not match it, and the board still verifies both
+before anything reaches its live tree. TLS was only ever protecting "these bytes are the release's" —
+the hash still does that, on the board. What the mirror added: the board no longer needs a working TLS
+stack to be updatable.
+
+**FIX 3 — the watchdog window is now honest.** Deleted `NETWORK_TIMEOUT_MS = 30000` (a fiction — see
+aggravator 1). `lib/watchdog.py` now exports `WDT_MAX_MS = TIMEOUT_MS` and `clamp_timeout_ms()`, and
+`arm()` clamps every request to the real ceiling, so a caller can no longer ask for a window the
+hardware will not grant. `main._run_update_check` no longer widens/restores a fuse that never existed;
+the update path is made *short* (plain HTTP, literal IP, 3 s per socket op) rather than *protected* by
+a fuse the RP2040 ignores. `tests/test_watchdog.py` pins the new policy (no `NETWORK_TIMEOUT_MS`,
+clamps at the ceiling, passes smaller through, rejects junk).
+
+**The transport had to be rewritten for boundedness.** `urequests` owns its socket and this board's
+`usocket` exposes no `setdefaulttimeout`, so it could not be bounded — and an unbounded read is
+exactly what tripped the fuse. It is replaced in the update path by `lib/net.py:http_get`, a raw
+socket with `settimeout` that bounds connect *and* every read, streams large bodies through a `sink`,
+and takes a `read_cap`. New host tests: `tests/test_net_http.py` (7/7, against a real local
+`HTTPServer`) and `tests/test_updater_fetch.py` (7/7 — fetch, refuse-https, non-200, sha256
+reject, full apply-stamps-version-and-archives-rollback, same-version no-op).
+
+**FIX 1 — the USB deploy.** `boot.py` and `lib/updater.py` are excluded from the pack, so only a USB
+deploy over the Mac's serial can change them; v0.1.28 plus these three fixes were pushed that way
+(see below).
+
+### Service gates (this run, `/firmware/*`)
+
+| Gate | Result |
+|---|---|
+| `npm run build` | ✓ (route emitted: `endpoints/firmware/_file_/_server.js`) |
+| `npm run check` (svelte-check) | 0 errors, 0 warnings |
+| `npm run lint` (prettier + eslint) | 0 errors (30 pre-existing warnings) |
+| `npx vitest run --coverage` | **147 passed / 11 files**; stmts 94.58 %, branches 86.54 %, funcs 92.85 %, lines 95.65 % |
+| new: `firmware.test.js` (10), `firmware-route.test.js` (7) | both green — serves, verifies, 404 shapes, 502 on sha256 mismatch / cold upstream miss, stale-served on a blip, one upstream fetch per check, local-dir mode never calls fetch |
+
+`firmware.js` 96.7 % stmts / 100 % funcs, `+server.js` 100 % / 100 %.
