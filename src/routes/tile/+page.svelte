@@ -109,6 +109,7 @@
   <section
     class="mirror"
     aria-live="polite"
+    class:idle={headline.idle}
     class:shout={headline.shout}
     class:handoff={snapshot.panel.state === "handoff"}
   >
@@ -222,6 +223,13 @@
   }
   .mirror.shout .headline {
     color: var(--c-go);
+  }
+  /* Idle is the one state whose headline is a picture rather than a word, so it
+     is centred in the card like a badge instead of reading as a left-aligned
+     line of text (`design-system.md` §9). */
+  .mirror.idle {
+    align-items: center;
+    text-align: center;
   }
 
   .chips {

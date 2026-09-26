@@ -79,6 +79,21 @@ describe("the tile mirrors the remote, read-only", () => {
     expect(screen.queryByText("Ambient")).toBeNull();
   });
 
+  it("marks the idle card so the picture can be centred, and only when idle", () => {
+    // The centring lives in CSS (`.mirror.idle`), so the hook is what the test
+    // can pin: lose the class and the picture silently falls back to the left.
+    const idle = renderTile();
+    expect(idle.container.querySelector(".mirror")).toHaveClass("idle");
+    cleanup();
+
+    const counting = renderTile({
+      state: "countdown",
+      routine: "bathtime",
+      remaining_s: 200,
+    });
+    expect(counting.container.querySelector(".mirror")).not.toHaveClass("idle");
+  });
+
   it("shows the routine headline and countdown only while counting down", () => {
     const { container } = renderTile({
       state: "countdown",
