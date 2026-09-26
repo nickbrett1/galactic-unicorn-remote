@@ -12,7 +12,7 @@ Lightweight progress record. Authority: `specs/plan.md`, `specs/spec/implementat
 | **Phase 2 — Backend (B1–B9)** | **DONE (this run)** | see below |
 | Phase 3 — Client / UI (D1–D5) | **DONE (this run)** — D4 `[MANUAL]` pending | see below |
 | Phase 4 — Integration | **DONE (this run)** | see below |
-| Phase 5 — Validation (E) | **V1/V2 done, V4 PASSED**; V3/V5–V7 `[MANUAL]` | see below |
+| Phase 5 — Validation (E) | **V1/V2 done, V4/V5 PASSED**; V3/V6/V7 `[MANUAL]` | see below |
 | Phase C — Firmware | separate repo | out of scope |
 
 ## Phase 2 — Backend (B1–B9)
@@ -324,21 +324,45 @@ Caveat to chase: the "slight freeze". Hypothesis (unverified) — the poll's syn
 visible when the target is unreachable. Worth a look in the firmware's `lib/remote.py` (e.g. bound the read,
 feed the WDT, avoid GC on the countdown path). Not a regression; a follow-up.
 
-**Still open in Phase 5:** V3, V5 (phone start ≡ physical press), V6 (dead-window honesty — never fires late),
-V7 are `[MANUAL]` and need the panel; V5/V6 are now runnable because the board polls. V8 is the deferred
-polish/hold list, and V2's negative case still wants one run on a host with Docker.
+**V5 — a phone start is a physical press — PASSED (2026-09-26).**
+
+Run against the live panel with the board polling. The whole point of the reconciliation design is that the
+remote is a **second producer of the same four button events**, not a parallel control path, so this test is
+about *equivalence*, not about the remote "working".
+
+The sequence, from the wire:
+
+- `POST /api/start {"routine":"bathtime"}` → **202** `{"gen":2,"action":"start","ttl_s":45}`.
+- The panel stayed **ambient for ~4 s** (the poll cadence), then announced **PROMPT**, then went to
+  **countdown bathtime**, `remaining_s 295` — i.e. a 5-minute countdown, exactly as a cap press.
+- A **second** start mid-countdown → **409** `{"error":"conflict","current_routine":"bathtime","offers":["replace"]}`
+  — never a silent switch, same as the physical rule that the other caps are inert while one runs.
+- Observed end-to-end latency ≈ **5 s**, which is simply the idle `next_poll_ms`, not a defect.
+
+**The one observation, chased and settled.** The operator asked "I didn't see the bath time animation?" — a
+fair question, because the physical press appears to show an animation. Investigation in the firmware repo
+proved there is no difference to see: a remote start is converted at `lib/routine.py:112-124` into exactly the
+tuple `("press", cap)` that a button handler produces, and from there it takes the identical PROMPT/HANDOFF
+render path. The only animation-like draw, `icons.draw_icon` (`lib/routine.py:259`), is reached *via state*,
+never by the producer — so no producer can produce a different visual. What the operator actually missed is
+that the **PROMPT announce is brief (~1–2 s)** and easy to lose under ~5 s of poll latency. Operator confirmed
+"it worked." No defect; recorded as a UX note, not a failure.
+
+**Still open in Phase 5:** V3, V6 (dead-window honesty — never fires late), V7 are `[MANUAL]` and need the
+panel; V6 is runnable because the board polls. V8 is the deferred polish/hold list, and V2's negative case
+still wants one run on a host with Docker.
 
 ## Side addition — the Homepage tile (`/tile`) and the NAS dashboard entry (2026-09-26)
 
 Not a phase from `plan.md`: a household-dashboard affordance requested once the panel was polling live.
 
 **Service — read-only tile.** New page `/tile` (`src/routes/tile/+page.server.js`, `+page.svelte`): the §3
-mirror with the controls removed — headline + interpolated countdown + state word + the "panel: last seen …"
-heartbeat + the three routine caps as inert chips. Wording comes only from `$lib/ui/format.js`, labels/artwork
-only from `routines.json`. It is a **page, not an endpoint** — the sealed eight-endpoint API set is unchanged.
-The palette tokens moved from `+page.svelte` into `src/app.css` (loaded once by `+layout.svelte`) so both
-surfaces share one source; `tests/ui-lint.test.js` now reads `src/app.css` for the contrast check.
-Documented in `specs/spec/ui/design-system.md` §9.
+mirror with the controls removed — headline + interpolated countdown + state word + the three routine caps as
+inert chips. Wording comes only from `$lib/ui/format.js`, labels/artwork only from `routines.json`. It is a
+**page, not an endpoint** — the sealed eight-endpoint API set is unchanged. The palette tokens moved from
+`+page.svelte` into `src/app.css` (loaded once by `+layout.svelte`) so both surfaces share one source;
+`tests/ui-lint.test.js` now reads `src/app.css` for the contrast check. Documented in
+`specs/spec/ui/design-system.md` §9.
 
 Gates (last run): `npm run build` pass · `npm run check` 0/0 · `npm run lint` 0 errors (23 warnings, the
 usual sonarjs/security) · `npx vitest run --coverage` **31 files/… all green**, coverage stmts 94.13 / branch
@@ -357,3 +381,78 @@ Docker auto-discovery; the `homepage.*` labels were removed from **both** the NA
 **Liveness snapshot at the time (proof Phase C works).** `/api/state` from the NAS:
 `panel {boot 3c7d31ff, fw 0.1.27, state ambient, online true, last_seen_s 1, threshold_s 15}`; cadence
 interlock confirmed earlier (a live `curl -N /api/events` subscriber dropped `last_seen_s` from ~19 to 1).
+
+## Tile refinements, and the firmware v0.1.28 changes (2026-09-26)
+
+Two strands finished together: three dashboard-driven refinements to the tile (this repo), and two
+household-driven changes to the panel's own behaviour (the firmware repo, delivered by OTA).
+
+### The tile refinements — PR #5, merged `a4ad5c3`, build 31 passed
+
+Requested after the tile had been live for a day and the operator had been reading it in anger:
+
+1. **The liveness line is gone from the tile.** "panel: last seen 2 s ago" is noise at a glance — the point of
+   the tile is *what the panel is doing*, not the heartbeat's exact age. It stays on the drill-in (§5) where
+   there is room to explain it; the tile's `data-online` attribute still carries the same fact for styling.
+2. **The trailing black space is gone.** The tile was `min-height: 100%`, so it stretched to whatever the iframe
+   gave it and the remainder was painted black. It is now content-sized, and the deploy snippet's iframe height
+   tightened from `h-80 md:h-[24rem] lg:h-[26rem]` to `h-44 md:h-48` so the frame matches the content.
+3. **"Ambient IDLE" became a picture of the panel + `IDLE`.** Two things were wrong with the old idle state:
+   the word "Ambient" told the reader nothing they did not already know, and a big green block read as a
+   *status lamp* rather than as *the panel*. Both surfaces now render a small inline picture of the panel —
+   the real 53x11 matrix, the way the hardware looks when nothing is running, with **one lit pixel in the
+   top-left** — beside the single word `IDLE`. It answers "what is this thing and what does idle look like?"
+   in the space the word "Ambient" used to waste.
+
+Done through the shared formatter seam, not by duplicating markup: `mirrorHeadline` gained an `idle` flag and
+both `/` and `/tile` branch on it, so the two surfaces cannot drift. `tests/ui-tile.test.js` was updated to
+assert the new idle state (IDLE + the panel picture, and explicitly *no* "last seen"), and
+`specs/spec/ui/design-system.md` §9 was corrected to match — it had claimed the tile shows the liveness line.
+
+### The firmware changes — cleanup 3 → 5 min, and a ta-da instead of an alarm
+
+Both in the firmware repo, both reported from the kitchen rather than found by a test:
+
+- **Cleanup is 5 minutes, not 3.** The operator noticed cleanup counting down to 3. That was *by design* —
+  `routines.json` has said 3 since commit `cbe3804`, alongside bathtime/booktime at 5 — so this was a change,
+  not a bug: the shorter cap made cleanup feel rushed next to the other two. Now 5, matching them.
+- **The completion sound is a ta-da, not an alarm.** The old `DONE_SOUND` was a 13-note repeated **square** wave
+  with a hard envelope — technically a fanfare, perceptually an alarm. It is now a warm 5-note
+  `G4–C5–E5–G5–C6` phrase with the last note held (0.95 s), on a **triangle** wave with a gentler ADSR
+  (`attack 0.04, decay 0.08, sustain 0.85, release 0.25, volume 0.75`). The firmware's `tests/test_sound.py`
+  gained two cases pinning the intent — `case_no_alarm` (no note shorter than 0.14 s, no immediate repeats) and
+  `case_configured_triangle` (TRIANGLE, volume 0.75) — 14/14 pass, and the host-side
+  `scripts/render-fanfare.py` preview was updated so what you hear on the Mac matches the board
+  (`/tmp/fanfare.wav`: 5 notes, 1.55 s, peak 0.37 of full scale — no clipping).
+
+### Shipping, and the OTA pickup that has not landed yet
+
+The refinements shipped the normal way: PR #5 → merged to `main` (`a4ad5c3`) → build **31** passed → the
+`main`-only `linux/amd64` image went to GHCR. Watchtower had **not** yet recreated the NAS container (it was
+still `Created 15:21:46Z`, and `/tile` still served the old markup — "panel: last seen 2 s ago" and
+"Ambient"), so the deploy was driven directly instead: `docker compose pull && up -d` on the NAS via the
+nas-goose agent, new container `Created 17:12:13Z`. Verified on the NAS host: `/health` → `200 {"status":"ok"}`,
+`grep -c 'last seen' /tile` → **0**, `/tile` → **IDLE**. The NAS `services.yaml` one-liner
+(`classes: h-44 md:h-48`, backup `services.yaml.bak.20260926-130924`) was applied in the same pass.
+
+**The firmware has not been picked up yet, and the diagnosis is worth writing down.** Release **v0.1.28** was
+published `16:47:30Z` (`firmware.pack` 139210 B, `manifest.json` 2251 B); `releases/latest/download/manifest.json`
+from here resolves to it (`302 → /releases/download/v0.1.28/manifest.json`, `cache-control: no-cache`). The board
+is still on **`fw 0.1.27`** at 17:20Z, boot `3f7c646d`, `uptime_s 4739` (booted ~16:01Z) — and *continuous
+uptime is itself the proof* that no apply happened, because a successful apply calls `_reset()` and would have
+rebooted the board.
+
+The retry logic explains the first miss and not the rest. `update_checked_at` is armed at loop start (~boot) and
+re-armed per attempt (`main.py:444-461`), so the cadence was ≈16:16:20, 16:31:20, **16:46:20**, 17:01:20,
+17:16:20 — the third attempt landed ~70 s *before* the release, which is the intrinsic "armed at boot, 15-min
+cadence, no wall clock" near-miss. But attempts at 17:01 and 17:16 should both have seen v0.1.28 and did not.
+Deferral is ruled out: ambient is neither COUNTDOWN nor HANDOFF, and `remote.busy()` is false; and a deferral
+would not consume the interval anyway. So it is a **join or fetch failure** (`check_for_update` swallows and
+logs, keeping current firmware), or a stale manifest — and the one line that separates them is
+`no update: 0.1.27 is already running` in the board's own `update.log`: present ⇒ the fetch succeeded and served
+the old manifest; **absent** ⇒ the failure is earlier. That file is only reachable over **USB serial** — the
+board is a pure outbound client (exactly one `socket.socket()` in the tree, immediately `.connect()`; no bind,
+no listen, no webREPL), and the server has **no** channel to nudge an update: the poll response the board reads
+is `{gen, next_poll_ms, action, routine, expires_at}` and `DESIRED_ACTIONS` is closed. The server can *defer* a
+check, never bring one forward. Next attempt ≈17:31; if it does not land, the options are a power-cycle (which
+re-runs `boot.py`'s update check) or plugging in USB to read `update.log` — there is no remote way in.
