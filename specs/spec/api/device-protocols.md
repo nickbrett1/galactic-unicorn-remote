@@ -256,3 +256,27 @@ TypeScript.
 | Board's `gen` high-water ahead of server (fresh server) | `applied_gen > gen` | re-seed `gen = applied_gen + 1` (memo §5.1) |
 | Heap failure, not link failure | poll fails while the radio is up with an address | logger records what the poll last reported and when (memo §11.15) |
 | Duplicated or lost poll response | — | converge, because the device is told what should be true (memo §5.2) |
+
+---
+
+## 11. Adjacent, and *not* part of this contract: `/firmware/*`
+
+The board also talks to the service for firmware updates, at
+`http://192.168.1.2:3009/firmware/manifest.json` (and the pack it names) — but that is **not** this
+protocol. It is a bare plain-HTTP `GET` on the board's own slow timer, not a poll; it carries no
+token, no `gen` and no reconciliation, and the response is the release's own artifact, byte for byte.
+
+It is here for one measured reason: the **board cannot complete a TLS handshake**. On 2026-09-26 the
+board was probed directly and DNS, `TCP:443` and plain HTTP (even to the internet) all work, but
+*every* HTTPS attempt fails instantly as `OSError(12,)` or blocks past the hardware watchdog and
+hard-resets the panel — so the old GitHub-over-HTTPS manifest URL could never be read. The fix is
+structural: the **service**, which has a working TLS stack, fetches the release over HTTPS on the
+board's behalf and serves it over plain HTTP. The board's update path now talks only to the host it
+already talks to every second.
+
+The trust story is unchanged, and that is the point: the manifest still carries a sha256 for the pack
+and one per file, the board still verifies both **before** anything reaches its live tree, and the
+mirror refuses to serve bytes that do not match the manifest. The only thing TLS was ever protecting
+here — that the manifest and pack are the release's — is still protected, by the hash, on the board.
+See `src/lib/server/firmware.js`, `src/routes/firmware/[file]/+server.js` and the OpenAPI path
+`GET /firmware/{file}`.
