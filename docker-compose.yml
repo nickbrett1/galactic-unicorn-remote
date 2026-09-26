@@ -30,11 +30,8 @@ services:
     environment:
       DEVICE_TOKEN: ${DEVICE_TOKEN:?DEVICE_TOKEN must be set — copy .env.example to .env and fill it in, or export it}
     labels:
+      # Watchtower pulls new images; nothing here drives the Homepage tile.
+      # The dashboard tile lives in Homepage's own services.yaml (see
+      # deploy/homepage-services.yaml) — the Docker auto-discovery provider
+      # would otherwise add a *second*, health-only tile under "Services".
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Services"
-      - "homepage.name=galactic-unicorn-remote"
-      - "homepage.href=http://nas:3009/"
-      - "homepage.widget.type=customapi"
-      - "homepage.widget.url=http://localhost:3009/health"
-      - "homepage.widget.mappings[0].field=status"
-      - "homepage.widget.mappings[0].label=Status"
