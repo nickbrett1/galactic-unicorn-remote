@@ -23,5 +23,5 @@
     widget:
       type: iframe
       src: http://nas:3009/tile
-      classes: h-80 md:h-[24rem] lg:h-[26rem]
+      classes: h-44 md:h-48
       refreshInterval: 5000

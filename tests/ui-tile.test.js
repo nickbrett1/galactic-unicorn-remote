@@ -71,10 +71,12 @@ describe("the tile mirrors the remote, read-only", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 
-  it("shows the ambient headline and a liveness line", () => {
+  it("shows the idle picture and IDLE, and carries no liveness line", () => {
     renderTile();
-    expect(screen.getByText("Ambient")).toBeInTheDocument();
-    expect(screen.getByText(/last seen/)).toBeInTheDocument();
+    expect(screen.getByText("IDLE")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAccessibleName(/idle/i);
+    expect(screen.queryByText(/last seen/)).toBeNull();
+    expect(screen.queryByText("Ambient")).toBeNull();
   });
 
   it("shows the routine headline and countdown only while counting down", () => {

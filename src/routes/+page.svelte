@@ -213,7 +213,50 @@
       <span class="dot" aria-hidden="true"></span>
       panel: last seen {formatLastSeen(lastSeenS)}
     </p>
-    <p class="routine">{headline.text}</p>
+    {#if headline.idle}
+      <!-- The idle headline is a picture of the panel itself: a 53x11 LED
+           matrix, dark body, one lit pixel in the top-left. Inline only —
+           no external artwork (`tests/ui-lint.test.js`). -->
+      <svg
+        class="panel"
+        viewBox="0 0 53 11"
+        role="img"
+        aria-label="Panel: idle, top-left pixel lit"
+      >
+        <defs>
+          <pattern
+            id="panel-dots"
+            width="1"
+            height="1"
+            patternUnits="userSpaceOnUse"
+          >
+            <circle cx="0.5" cy="0.5" r="0.16" fill="var(--c-muted)" />
+          </pattern>
+        </defs>
+        <rect
+          x="0.25"
+          y="0.25"
+          width="52.5"
+          height="10.5"
+          rx="1.5"
+          fill="var(--c-surface)"
+          stroke="var(--c-muted)"
+          stroke-width="0.5"
+        />
+        <rect
+          x="0.25"
+          y="0.25"
+          width="52.5"
+          height="10.5"
+          rx="1.5"
+          fill="url(#panel-dots)"
+          opacity="0.25"
+        />
+        <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
+      </svg>
+    {:else}
+      <p class="routine">{headline.text}</p>
+    {/if}
     {#if snapshot.panel.state === "countdown" && countdownText}
       <p class="countdown">{countdownText}</p>
     {/if}
@@ -340,6 +383,13 @@
   }
   .liveness.stale .dot {
     background: var(--c-danger);
+  }
+  .panel {
+    display: block;
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    aspect-ratio: 53 / 11;
   }
   .routine {
     margin: 0;
