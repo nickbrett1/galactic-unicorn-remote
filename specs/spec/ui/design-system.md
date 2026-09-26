@@ -142,8 +142,14 @@ formatters** — the tile is the mirror of §3 with the controls removed.
 - **Same wording as the remote.** Headline, countdown and state word all come from `$lib/ui/format.js`, so the
   tile can only ever say what the remote says. Routine labels and artwork come from the catalogue on `data`;
   nothing is hard-coded (§2).
-- **Liveness is still shown** (§5): the tile carries the "panel: last seen …" heartbeat with the same green/red
-  dot, so a stale mirror is visible without a click.
+- **Liveness is on the drill-in, not the tile.** The tile answers "what is the panel doing" at a glance, so the
+  "panel: last seen …" heartbeat lives on `/` (§5) where there is room to explain it; the tile still carries
+  `data-online` for its own styling.
+- **Idle is a picture, centred.** When nothing is running the headline is a small inline drawing of the panel
+  itself — a 53x11 LED matrix with one lit pixel in the top-left, the way the hardware looks when idle — beside
+  the single word `IDLE`. It is centred in the card (`.mirror.idle`) because it is a badge, not a line of text;
+  every other state stays left-aligned. Note "Ambient" is deliberately not used: it told the reader nothing.
+  The drawing is inline SVG — no external artwork (§2, `tests/ui-lint.test.js`).
 - **The three routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
   the same symbol language as the buttons, with no affordance to press.
 - **Not an API surface.** `/tile` is a page; the sealed eight-endpoint API set (memo §6, OpenAPI) is unchanged.
