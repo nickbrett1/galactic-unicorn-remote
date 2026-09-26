@@ -168,7 +168,13 @@ describe("D1 — the shell and exactly four controls", () => {
     const { container } = renderPage();
     expect(container.querySelector('[aria-live="polite"]')).toBeTruthy();
     expect(container.textContent).toContain("panel: last seen 2 s ago");
-    expect(container.textContent).toContain("Ambient");
+  });
+
+  it("shows the idle picture and IDLE instead of an Ambient headline", () => {
+    const { container } = renderPage();
+    expect(container.textContent).toContain("IDLE");
+    expect(container.textContent).not.toContain("Ambient");
+    expect(screen.getByRole("img")).toHaveAccessibleName(/idle/i);
   });
 
   it("shouts the routine in HANDOFF", () => {

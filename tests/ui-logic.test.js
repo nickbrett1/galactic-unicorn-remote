@@ -51,28 +51,32 @@ describe("labelForRoutine", () => {
 });
 
 describe("mirrorHeadline", () => {
-  it("names the routine while prompt/countdown, shouts on handoff", () => {
+  it("names the routine while prompt/countdown, shouts on handoff, flags idle", () => {
     expect(mirrorHeadline({ state: "ambient" }, ROUTINES)).toEqual({
-      text: "Ambient",
+      text: "",
       shout: false,
+      idle: true,
     });
     expect(
       mirrorHeadline({ state: "prompt", routine: "booktime" }, ROUTINES),
     ).toEqual({
       text: "Booktime",
       shout: false,
+      idle: false,
     });
     expect(
       mirrorHeadline({ state: "countdown", routine: "cleanup" }, ROUTINES),
     ).toEqual({
       text: "Cleanup",
       shout: false,
+      idle: false,
     });
     expect(
       mirrorHeadline({ state: "handoff", routine: "bathtime" }, ROUTINES),
     ).toEqual({
       text: "BATHTIME!",
       shout: true,
+      idle: false,
     });
     expect(mirrorHeadline({ state: "handoff" }, ROUTINES).text).toBe(
       "HANDOFF!",
@@ -80,6 +84,7 @@ describe("mirrorHeadline", () => {
     expect(mirrorHeadline({ state: "prompt" }, ROUTINES).text).toBe(
       "Panel starting",
     );
+    expect(mirrorHeadline({ state: "prompt" }, ROUTINES).idle).toBe(false);
   });
 });
 
@@ -88,8 +93,8 @@ describe("stateWord", () => {
     expect(stateWord("prompt")).toBe("Starting");
     expect(stateWord("countdown")).toBe("Counting down");
     expect(stateWord("handoff")).toBe("Done");
-    expect(stateWord("ambient")).toBe("Idle");
-    expect(stateWord(undefined)).toBe("Idle");
+    expect(stateWord("ambient")).toBe("IDLE");
+    expect(stateWord(undefined)).toBe("IDLE");
   });
 });
 

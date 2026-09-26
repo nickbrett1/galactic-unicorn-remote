@@ -51,33 +51,37 @@ export function labelForRoutine(routines, id) {
 }
 
 /**
- * The mirror's headline: the routine name, HANDOFF briefly shouting it, or
- * "Ambient". Returns the raw text plus whether it should be rendered as a shout
- * so the component can apply `prefers-reduced-motion` styling.
+ * The mirror's headline: the routine name, HANDOFF briefly shouting it, or —
+ * when the panel is idle — no headline word at all. Returns the raw text plus
+ * whether it should be rendered as a shout (so the component can apply
+ * `prefers-reduced-motion` styling) and an `idle` flag: on idle the headline
+ * word is replaced by a small picture of the panel itself.
  *
  * @param {{state?: string, routine?: string | null}} panel
  * @param {ReadonlyArray<{id: string, label: string}>} routines
- * @returns {{text: string, shout: boolean}}
+ * @returns {{text: string, shout: boolean, idle: boolean}}
  */
 export function mirrorHeadline(panel, routines) {
   const label = labelForRoutine(routines, panel?.routine);
   switch (panel?.state) {
     case "prompt":
     case "countdown":
-      return { text: label ?? "Panel starting", shout: false };
+      return { text: label ?? "Panel starting", shout: false, idle: false };
     case "handoff":
       return {
         text: label ? `${label.toUpperCase()}!` : "HANDOFF!",
         shout: true,
+        idle: false,
       };
     default:
-      return { text: "Ambient", shout: false };
+      return { text: "", shout: false, idle: true };
   }
 }
 
 /**
  * A one-word state word so colour is never the only signal (WCAG 2.1 AA,
- * `design-system.md` §6).
+ * `design-system.md` §6). The idle panel reads "IDLE" — the sole text on the
+ * idle mirror, since the ambient headline is replaced by the panel picture.
  *
  * @param {string | undefined} state
  * @returns {string}
@@ -91,6 +95,6 @@ export function stateWord(state) {
     case "handoff":
       return "Done";
     default:
-      return "Idle";
+      return "IDLE";
   }
 }
