@@ -418,6 +418,7 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
         state: "countdown",
         routine: "cleanup",
         remaining_s: "42",
+        wedge: "heap0.link1.other0.cy1.rec1.pk1",
       }),
     });
     const res = getState({ locals: { door: TUNNEL } });
@@ -433,6 +434,8 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
     });
     // relayed verbatim from the board, never recomputed
     expect(body.panel.remaining_s).toBe(42);
+    // the board's own wedge tally, relayed verbatim (firmware lib/wedge.py)
+    expect(body.panel.wedge).toBe("heap0.link1.other0.cy1.rec1.pk1");
     expect(body.routines).toHaveLength(3);
     expect(body.routines.map((r) => r.id)).toEqual([
       "bathtime",

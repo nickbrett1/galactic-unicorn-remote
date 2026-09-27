@@ -924,3 +924,30 @@ So the boot-side sequence — `boot.py` → `updater.run()` → `_recover()` (ph
 → `_mark_attempt()` in the `finally` — is now proven end to end on the device, across real resets,
 for the decision that matters: a flaky first boot is survived, and a release that cannot prove itself
 on `BOOT_FAILS_MAX` boots is rolled back on the boot after.
+
+## 0.1.38 is on the board; the wedge journal is live (2026-09-27, session 6)
+
+The board was still on 0.1.37, so the wedge journal was shipped but not running. It is now deployed
+and the instrumentation is live, confirmed from both ends:
+
+  * `boot.py` applied it: `update: applied 0.1.38 (184354 bytes, 17 files)`, rebooting into
+    `unicorn: BOOT galactic-unicorn / rp2040 fw=0.1.38`;
+  * `version.txt=0.1.38`, `boot-ok=0.1.38` (proven after the soak), `lib/wedge.py` present
+    (sha `1f266b56…`), `wifi.log` header now `fw=0.1.38`;
+  * the service sees `panel.fw=0.1.38, online=true, last_seen_s=6` — the board is polling again.
+
+Surfaced the tally on the read side too: `buildStateSnapshot` now relays `observed.wedge` verbatim
+(like `remaining_s`), so the board's own account of a quiet window is visible in `/api/state` without
+the server parsing it. `tests/backend.test.js` asserts it end to end; 164/164.
+
+**Incident, recorded because it is the kind of thing this board punishes.** Restoring `config.py`
+after the rollback test, the cleanup wrote
+`open('config.py','w').write(open('config.py.bak').read())` — Python truncates `config.py` when the
+`open(...,'w')` is evaluated, before the read, so a missing/empty backup would have left it 0 bytes;
+it did. With an empty `config.py`, `updater._run` sees no `UPDATE_ENABLED` and returns before
+recovery *and* the update — the board silently stopped polling (the service showed `last_seen_s` at
+~1001 s) and no update could ever land. Recovered from the release pack itself:
+`config.py` carries **no secrets** (they live in the gitignored `config_secrets.py`, which the pack
+never touches), so the pack's `config.py` was restored to the board by USB — sha `8d876b70…`,
+identical to the manifest — and the next boot applied 0.1.38. The lesson: never write a file from a
+reader of the same file in one expression; and a packed `config.py` is the recovery source of truth.

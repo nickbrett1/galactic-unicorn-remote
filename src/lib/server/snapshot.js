@@ -50,6 +50,10 @@ export function buildStateSnapshot({
         ...(observed.uptime_s !== undefined
           ? { uptime_s: observed.uptime_s }
           : {}),
+        // The board's own wedge tally (firmware lib/wedge.py), relayed
+        // verbatim like remaining_s: only the board can classify its own
+        // poll failures, so the server never parses or interprets it.
+        ...(observed.wedge !== undefined ? { wedge: observed.wedge } : {}),
       }
     : { boot: null, fw: null, applied_gen: 0, state: "ambient" };
 
