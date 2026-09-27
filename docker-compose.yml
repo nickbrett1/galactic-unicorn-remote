@@ -29,6 +29,18 @@ services:
     # container that would exit on boot.
     environment:
       DEVICE_TOKEN: ${DEVICE_TOKEN:?DEVICE_TOKEN must be set — copy .env.example to .env and fill it in, or export it}
+      # The wedge watchdog (powercycle.js) is inert unless POWER_CYCLE_ENABLED
+      # is 1 AND KASA_HOST names the HS100. Compose forwards nothing it is not
+      # told to, so these are listed here with safe defaults; the NAS-side
+      # `.env` overrides them without touching this file.
+      POWER_CYCLE_ENABLED: ${POWER_CYCLE_ENABLED:-0}
+      KASA_HOST: ${KASA_HOST:-}
+      KASA_PORT: ${KASA_PORT:-9999}
+      POWER_CYCLE_STALE_S: ${POWER_CYCLE_STALE_S:-180}
+      POWER_CYCLE_COOLDOWN_S: ${POWER_CYCLE_COOLDOWN_S:-600}
+      POWER_CYCLE_MAX: ${POWER_CYCLE_MAX:-2}
+      POWER_CYCLE_OFF_MS: ${POWER_CYCLE_OFF_MS:-5000}
+      POWER_CYCLE_CHECK_MS: ${POWER_CYCLE_CHECK_MS:-15000}
     labels:
       # Watchtower pulls new images; nothing here drives the Homepage tile.
       # The dashboard tile lives in Homepage's own services.yaml (see

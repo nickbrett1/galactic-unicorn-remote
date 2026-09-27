@@ -788,3 +788,47 @@ subnet, or a different model. `KASA_HOST` therefore has to be supplied; the docu
 carries the whole block (`POWER_CYCLE_ENABLED`, `KASA_HOST`, `KASA_PORT`, `POWER_CYCLE_STALE_S`,
 `POWER_CYCLE_COOLDOWN_S`, `POWER_CYCLE_MAX`, `POWER_CYCLE_OFF_MS`, `POWER_CYCLE_CHECK_MS`), and
 turning it on is a two-line change once the address is known.
+
+## The plug is at 192.168.1.66 — and it speaks TCP, not UDP (2026-09-27, session 5)
+
+With the address supplied, the plug answered immediately — but not over the transport the monitor was
+written for, which is the kind of thing only a live probe finds:
+
+| probe from mac-studio | result |
+| --- | --- |
+| `ping 192.168.1.66` | 0 % loss, 2.9 ms — the host is up |
+| ARP | `50:c7:bf:74:77:35` — TP-Link OUI |
+| UDP `9999` `get_sysinfo`, ×3 | **silent** (all three) |
+| UDP discovery `20002` / `9999` | **silent** |
+| TCP `9999` connect | **open** |
+| TLS handshake on `9999` (1.2 and 1.3) | 0 bytes read — not TLS |
+| **legacy XOR frame over TCP `9999`** | **answers**: `{"system":{"get_sysinfo":{...,"model":"HS100(US)"}}}` |
+
+So the same 4-byte-length + XOR framing the module already had comes back over **TCP** while UDP is
+dead, and `get_sysinfo` decodes to a real device:
+
+```
+alias       : Galactic Unicorn
+model       : HS100(US)
+sw_ver      : 1.2.6 Build 200727 Rel.120528
+hw_ver      : 1.0
+mac         : 50:C7:BF:74:77:35
+relay_state : 1        # on, and the board has been up ~23 h
+```
+
+The first sweep "found nothing" for a duller reason too: the dev container sits on `192.168.215.0/24`
+and never could reach `192.168.1.0/24` — but the **service container can**, which is the vantage that
+matters, and it reaches the plug at `192.168.1.66:9999` as well. So the monitor's own network view is
+sound; only the transport was wrong.
+
+`powercycle.js` was fixed to speak TCP: `dgram` → `net`, connect, write the frame, and reassemble the
+reply from the stream. The reassembly is a pure helper, `tryReadKasaFrame(buf)`, so the split-header
+and split-body cases are unit-tested without a socket — 4 new tests, 163/163. Verified live: a
+throwaway vitest probe drove `kasaCommand` against the real plug from the service container and read
+`HS100(US)` / `err_code 0`. `docker-compose.yml` now forwards the eight `POWER_CYCLE_*`/`KASA_*` vars
+with safe defaults, because Compose passes nothing it is not told to and the arming has to be a
+NAS-side `.env` change.
+
+**Still to arm it:** set `POWER_CYCLE_ENABLED=1` and `KASA_HOST=192.168.1.66` in the NAS project's
+`.env` and redeploy. Off-hold-on is proven in unit tests but not yet exercised against this plug — a
+one-shot `powerCycle` against it is the last check before trusting it.
