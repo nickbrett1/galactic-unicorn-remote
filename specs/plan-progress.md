@@ -539,3 +539,101 @@ deploy over the Mac's serial can change them; v0.1.28 plus these three fixes wer
 | new: `firmware.test.js` (10), `firmware-route.test.js` (7) | both green — serves, verifies, 404 shapes, 502 on sha256 mismatch / cold upstream miss, stale-served on a blip, one upstream fetch per check, local-dir mode never calls fetch |
 
 `firmware.js` 96.7 % stmts / 100 % funcs, `+server.js` 100 % / 100 %.
+
+## The ENOSPC was a full flash, not a big update (2026-09-27)
+
+`OSError(28,), ENOSPC` on every update was **not** the update's flash peak. It was a full
+filesystem. The board's flash FS is only **768 KB** (`os.statvfs` lies — it reported 16 MB and
+was treated as unreliable for two sessions). What was on it:
+
+| Item | Bytes | What it was |
+|---|---|---|
+| `:spacetest.bin` | **348,160** | the abandoned write-until-fail free-space probe; the board reset mid-probe, so it was never removed |
+| `:prev/` + `prev.json` | **~170,000** | a rollback slot left behind after the release it judged was rolled back |
+| `*_tmp.py`, `ntp-probe.txt` | ~4,000 | REPL scratch from earlier sessions |
+
+Free was **120 KB** — smaller than the **171,845-byte** pack — so `_download` failed with
+`OSError(28)` before unpacking anything. Clearing the leftovers took free to **483 KB**, and the
+next boot then ran `applied 0.1.33 (171845 bytes, 16 files)`. The OTA mechanism was fine; the flash
+was full. (PR #7's peak reduction is still a real improvement, just not the cause.)
+
+The release tree itself was already correct: **all 16 manifest files hash-identical** on the board
+(`main.py e000531d`, `config.py 8d876b70`, `lib/net.py 19ea59d6`, `lib/remote.py 6f2a0cad`, …), and
+v0.1.33 is now the running firmware.
+
+**Two firmware bugs fixed** (`lib/updater.py`, USB-deployed — it is excluded from the pack):
+one leftover pack is enough to turn one ENOSPC into a permanent loop, so `_update` now sweeps
+`:incoming.pack` + `:next/` before spending any flash and `check_for_update` cleans up on failure
+(previously only `_run` did); and `_recover` now drops the `:prev/` slot once the release is proven
+(`boot-ok == version`), instead of leaking it forever. New host tests: `test_recover.py` 5/5,
+`test_updater_fetch.py` 8/8, full firmware suite green.
+
+**Rollback fragility, still open:** the good release was rolled back twice as "it never came up",
+because `main.py` writes `boot-ok.txt` only after 10 s of loop (`BOOT_OK_SOAK_MS = 10000`, > the 8 s
+watchdog) and the protocol gives a release exactly one chance. One flaky first boot — a low-heap
+`MemoryError`, a radio wedge, or a reset inside the window — discards a release that is fine.
+
+**Still open (the blocker):** the board is back in the deaf-radio wedge + WDT reset loop —
+`poll failed … OSError(110,) link=True status=3`, `radio cycle did not recover the radio`, and it is
+network-unreachable (`ping 192.168.1.63` → 100 % loss) while reporting link up. `radio_reset` cleared
+this once (14:33, reported success) but not now. See `/tmp/HANDOFF-radio.md`.
+
+## The OTA path is proved end-to-end, and the in-loop check had a heap bug (2026-09-27, session 3)
+
+The sweep fix merged as **77c5bfc** (PR `fix/updater-sweep-staging`), a lint fix followed
+(**f1bf659**, ruff `PLR1730` at `lib/remote.py:604`, which is what broke Buildkite #55/#56), and
+Buildkite **#57 went green**. The Release step then cut **v0.1.34** on its own — the pack hash had
+changed because `lib/remote.py` changed (boot.py / lib/updater.py are excluded from the pack).
+
+**v0.1.34 taken over OTA, on the real board.** The board's boot-time check (boot.py, fresh heap)
+applied it: `applied 0.1.34 (172775 bytes, 16 files)`, new boot id, and — this is the fix being
+exercised — the next boot's `_recover` cleared the pending attempt and **dropped the rollback
+slot**. Read back over the raw REPL:
+
+| file / slot | value | meaning |
+| --- | --- | --- |
+| `version.txt` | `0.1.34` | running release |
+| `boot-ok.txt` | `0.1.34` | soaked 10 s and proved itself |
+| `boot-try.txt` | **absent** | `_recover` cleared it on the next boot |
+| `:prev/`, `prev.json` | **absent** | the ~170 KB slot is no longer leaked |
+| `:next/`, `:incoming.pack` | absent | staging swept |
+| free | **479232 / 786432** | back to healthy (was 236 KB in the ENOSPC spiral) |
+
+So the ENOSPC spiral is closed on hardware, not just in host tests.
+
+**New bug found: the IN-LOOP update check cannot allocate.** Its turn came 15 min after the loop
+started and failed:
+
+```
+update: update check failed, keeping current firmware: MemoryError('memory allocation failed, allocating 3840 bytes',)
+```
+
+while `gc.mem_free()` read **93488**. The check fits under the fuse (that was the earlier fix) but
+not under a *fragmented* heap: the loop holds the display, engine and remote live, so the ~2.2 KB
+manifest fetch/parse cannot get one contiguous block. The **same check at boot.py** (fresh heap)
+fetches that manifest fine — which is exactly why an update could always land at boot but never
+from the running app. Fixed with one `gc.collect()` before the check in `main.py:_run_update_check`
+(the same thing `_attach_remote` already does, and the reason it does it). Full firmware suite green,
+ruff clean; merged **8d20976**, Buildkite **#58/#59 green**, Release cut **v0.1.35** (pack changed:
+`main.py` is in the pack).
+
+**v0.1.35 taken over OTA too.** `applied 0.1.35 (173397 bytes, 16 files)`, `fw=0.1.35`,
+`free=121232`, NTP synced on attempt 1. And the fix is confirmed on the board: the next in-loop
+check, 15 min after the loop started, logged
+
+```
+update: no update: 0.1.35 is already running
+```
+
+— it completed the fetch/parse, with **no MemoryError**. That line is the first time the running
+app's update check has ever got as far as reading the manifest.
+
+**The radio is still the wildcard.** The immediate v0.1.35 attempt failed first
+(`update failed, keeping current firmware: OSError(110,)`, `ntp: attempt 3/3 failed
+([Errno 110] ETIMEDOUT)`) while the board reported `status=3(up) ip=192.168.1.63 rssi=-39` — and
+`ping 192.168.1.63` from the host was 100 % loss. Minutes later the same board answered ping and the
+same boot check applied the pack. So the wedge is **intermittent, not terminal**: the update path
+works whenever the radio has a window, but nothing yet predicts the window. Driving the board's
+REPL needs `mpremote`'s Ctrl-C to land, which it does not while `main.py` is looping; a direct
+pyserial `Ctrl-C` + `Ctrl-D` (and a raw-REPL peek) does, and the armed 8 s watchdog then resets the
+board a few seconds later — the soft reset that lands an update.
