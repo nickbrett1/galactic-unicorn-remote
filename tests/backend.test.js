@@ -23,6 +23,7 @@ import {
   beginReplaceSequence,
   getDesired,
   getGen,
+  getObserved,
   nowEpochS,
   recordObserved,
   resetState,
@@ -98,6 +99,7 @@ describe("/device/poll — auth and validation", () => {
       { remaining_s: "-1" },
       { rssi: "5" },
       { uptime_s: "-2" },
+      { wedge: "x".repeat(65) },
     ];
     for (const override of cases) {
       const res = poll({ url: pollUrl(override) });
@@ -119,6 +121,15 @@ describe("/device/poll — auth and validation", () => {
       }),
     });
     expect(res.status).toBe(200);
+  });
+
+  it("relays the board's wedge tally verbatim (firmware lib/wedge.py)", async () => {
+    const tally = "heap0.link2.other0.cy1.rec1.pk2";
+    const res = poll({ url: pollUrl({ wedge: tally }) });
+    expect(res.status).toBe(200);
+    // Stored on the observed slot, unparsed: only the board can classify its
+    // own failures, so the service relays the string and does not interpret it.
+    expect(getObserved().wedge).toBe(tally);
   });
 
   it("seeds gen = applied_gen + 1 on the first poll (R6) and returns a tiny body", async () => {

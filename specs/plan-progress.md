@@ -852,3 +852,36 @@ command `powerCycle()` sends, accepted and a no-op. Then it was armed on the NAS
 So the last-resort recovery is live and watching. It stays a no-op until the board is silent for 180 s;
 the first genuine wedge is the first real exercise, and the `wedge went quiet` / `wedge recovered`
 edges it writes to the audit log are the instrumentation to read afterwards.
+
+## Board-side instrumentation: the wedge journal (2026-09-27, session 5)
+
+The watchdog closes the loop from *outside*, but the service can only ever see **that** the panel went
+quiet — the poll heartbeat stops. **Why** it went quiet is board-side knowledge the service cannot
+reach, and the board cannot shout it over the radio that is broken. Two more things conspire to
+destroy the evidence: the REPL scrolls away, and a CYW43 wedge usually ends in a **WDT hard reset**
+(`reset_cause=3`, a latch) that takes RAM counters with it.
+
+So the board now keeps its own bounded flash trace, `lib/wedge.py`, in the same shape as the existing
+`lib/wifihealth.py`:
+
+  * a **header per boot** (lazily, on the first event) naming the boot id and reset cause, so a reset
+    loop reads as a wall of headers rather than one ambiguous session;
+  * a **line per failed poll** — `cause` (`classify_failure`'s heap/link/other verdict), the
+    exception, `heap_free`, `link`, `status`, engine `state`, and the running failure count;
+  * a **line each time a radio cycle is requested and each time its outcome is known**
+    (recovered / not);
+  * a **recovery line** naming the length of the run that just ended.
+
+A healthy board writes nothing — events are failures and cycles, not the poll cadence.
+
+The part that crosses the boundary: the journal also keeps **per-boot counters** (class tallies,
+cycles attempted/recovered, peak run, runs) and `remote.py` carries a compact summary of them back
+over the wire. `reconcile.build_report` grew an optional `wedge` field and `poll_path` emits it, so
+the **next successful poll** hands the service the board's own account of the same quiet window. The
+service stores it unparsed (`/device/poll` accepts the param, `recordObserved` keeps it) — only the
+board can classify its own failures, so the service relays the string rather than interpreting it.
+
+7 new host tests in `tests/test_wedge.py` (header per boot, class counts and run/peak, cycle scoring,
+the summary shape, the recovery line, the byte cap, and never-raises), picked up automatically by the
+CI glob; 13/13 firmware test files pass. `ruff`/`pytest` green expected on the pipeline. The service
+side adds one accepted param and two tests (164/164). Firmware on main `60dc536`.

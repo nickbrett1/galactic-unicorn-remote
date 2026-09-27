@@ -112,6 +112,18 @@ function parsePollReport(params) {
     report.uptime_s = value;
   }
 
+  // The board's own wedge tally (firmware lib/wedge.py), carried as an opaque
+  // short string: heap/link/other failure counts, radio cycles attempted and
+  // recovered, and the peak failure run. The service only relays and stores it -
+  // the board is the only thing that can classify its own failures, so parsing
+  // it here would be guessing at the board's vocabulary.
+  const wedge = params.get("wedge");
+  if (wedge !== null) {
+    const value = stringAtMost(wedge, 64);
+    if (value === null) return { ok: false, detail: "wedge" };
+    report.wedge = value;
+  }
+
   return { ok: true, report };
 }
 
