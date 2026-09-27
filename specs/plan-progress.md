@@ -751,3 +751,40 @@ applied 0.1.37 in-loop-on-boot was still running **0.1.36's** `main.py`, so the 
 have written the false `crash.log` was the *old* one. The fix protects applies made *by* 0.1.37+, so
 the first real exercise is the next release applied by a running 0.1.37 (its in-loop check), and the
 signal to look for is a clean reboot with `crash.log` left absent.
+
+## The wedge watchdog: recovery from outside the board (2026-09-27, session 4)
+
+The CYW43 "deaf radio" wedge is now the only thing blocking unattended updates, and it has a
+property that decides the whole design: the board **cannot ask for its own recovery** — the radio it
+would ask over is the broken part. So the power-cycle had to be driven from outside, and the service
+is the natural owner because the board already polls it every few seconds. `/device/poll` records
+`received_at`, `getLiveness()` derives `last_seen_s`, and a wedge is simply "no poll for N seconds" —
+a detector that already existed, with **nothing new to deploy on the board**.
+
+`src/lib/server/powercycle.js` adds:
+
+  * the Kasa (TP-Link) legacy protocol — autokey-XOR cipher, 4-byte length framing, relay command —
+    as pure functions, so the bytes are unit-testable without a plug on the bench;
+  * `decideWedgeAction`, the pure decision table: disabled and online are answered *before* any clock
+    is consulted, then a quiet threshold, a per-wedge cycle budget and a cool-down;
+  * the monitor, started from `hooks.server.js`'s `init` — an interval that is a no-op unless
+    `POWER_CYCLE_ENABLED` is set, so build analysis arms nothing.
+
+**A power-cycle is the last resort, not the first.** `radio_reset` clears the wedge sometimes
+(observed 14:33) and not others, so it cannot be a guarantee; a cycle always works but costs a reboot,
+a wifi join and the panel's state, so it waits 180 s of quiet (well past the 15 s offline threshold,
+so the board's own retries get a real chance), is budgeted at 2 per wedge, and is held to a 600 s
+cool-down so a board still booting is not cut again. It is ordered **off, hold, on** rather than a
+toggle, so it is correct whatever state the plug was in. The same two edges are the instrumentation
+the plan asked for: `wedge went quiet` and `wedge recovered after Ns quiet` are written to the audit
+log, turning "when did the window close" from a recollection into a record.
+
+159/159 service tests pass (12 new), prettier and eslint clean (warnings only, the same
+`detect-object-injection` class the existing `readNumber` already produces).
+
+**Not yet enabled, and why.** A read-only `get_sysinfo` sweep of `192.168.1.0/24:9999` from both the
+dev container and mac-studio found no Kasa device, so the plug is either not powered, not on this
+subnet, or a different model. `KASA_HOST` therefore has to be supplied; the documented env file now
+carries the whole block (`POWER_CYCLE_ENABLED`, `KASA_HOST`, `KASA_PORT`, `POWER_CYCLE_STALE_S`,
+`POWER_CYCLE_COOLDOWN_S`, `POWER_CYCLE_MAX`, `POWER_CYCLE_OFF_MS`, `POWER_CYCLE_CHECK_MS`), and
+turning it on is a two-line change once the address is known.

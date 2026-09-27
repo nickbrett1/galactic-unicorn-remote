@@ -22,6 +22,7 @@
  */
 
 import { config, assertRuntimeConfig } from "./lib/server/config.js";
+import { startPowerCycleMonitor } from "./lib/server/powercycle.js";
 
 /** Hostname of a request URL, lower-cased, or null when unparseable. */
 function hostOf(rawUrl) {
@@ -65,6 +66,9 @@ export function classifyDoor(request) {
  */
 export function init() {
   assertRuntimeConfig(config);
+  // The wedge watchdog. A no-op unless POWER_CYCLE_ENABLED is set, so the build
+  // analysis that imports this module arms nothing.
+  startPowerCycleMonitor();
 }
 
 /**

@@ -31,6 +31,20 @@ function readNumber(name, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+/**
+ * Read a boolean env var. Only the usual truthy spellings are true: a typo like
+ * `POWER_CYCLE_ENABLED=yes-please` must not silently arm a power-cycling
+ * watchdog, and it must not silently disable one the operator thinks is on.
+ *
+ * @param {string} name
+ * @param {boolean} fallback
+ */
+function readBool(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(raw.trim().toLowerCase());
+}
+
 const deviceToken = process.env.DEVICE_TOKEN ?? "";
 
 /**
@@ -86,6 +100,33 @@ export const config = Object.freeze({
    * packs"). Empty (the default) means mirror the release.
    */
   firmwareLocalDir: process.env.FIRMWARE_LOCAL_DIR ?? "",
+  /**
+   * The wedge watchdog (`powercycle.js`). Off by default: the monitor is a
+   * no-op unless this is set, so importing the module on a build machine arms
+   * nothing. Turn it on only where a KASA_HOST is reachable.
+   */
+  powerCycleEnabled: readBool("POWER_CYCLE_ENABLED", false),
+  /** The HS100's LAN address. Required when `powerCycleEnabled`. */
+  kasaHost: process.env.KASA_HOST ?? "",
+  /** TP-Link's fixed UDP port; overridable only for a test double. */
+  kasaPort: readNumber("KASA_PORT", 9999),
+  /**
+   * Quiet for this long before the panel is judged wedged. Well past the poll
+   * cadence and `offlineThresholdS` (15 s), because a cycle costs a reboot: the
+   * board's own retries must have had a real chance first. Default 180 s.
+   */
+  powerCycleStaleS: readNumber("POWER_CYCLE_STALE_S", 180),
+  /**
+   * Minimum gap between cycles, so a board that is slow to rejoin after a
+   * cycle is not cycled again while it is still booting. Default 600 s.
+   */
+  powerCycleCooldownS: readNumber("POWER_CYCLE_COOLDOWN_S", 600),
+  /** Cycles allowed per wedge. Spent, the monitor stops until the panel is back. */
+  powerCycleMax: readNumber("POWER_CYCLE_MAX", 2),
+  /** How long the relay is held off. Must drop the regulator and the CYW43. */
+  powerCycleOffMs: readNumber("POWER_CYCLE_OFF_MS", 5000),
+  /** Monitor period. Cheap: one in-memory liveness read unless something is wrong. */
+  powerCycleCheckMs: readNumber("POWER_CYCLE_CHECK_MS", 15000),
   /** True for development/test; false in any production run. */
   isDevOrTest,
 });
