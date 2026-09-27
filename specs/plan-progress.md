@@ -951,3 +951,18 @@ recovery *and* the update — the board silently stopped polling (the service sh
 never touches), so the pack's `config.py` was restored to the board by USB — sha `8d876b70…`,
 identical to the manifest — and the next boot applied 0.1.38. The lesson: never write a file from a
 reader of the same file in one expression; and a packed `config.py` is the recovery source of truth.
+
+### The wire path, closed end to end (same session)
+
+Redeployed the NAS container onto the new image (`ab08f758… → aad139fc…`, via nas-goose; `.env`
+untouched, `POWER_CYCLE_ENABLED=1`/`KASA_HOST=192.168.1.66` preserved, `/health` ok, startup log now
+reads `max 2/wedge`). With that, `/api/state` shows the board's own tally live:
+
+    panel.fw = 0.1.38   online = true   last_seen_s = 5   uptime_s = 354
+    panel.wedge = 'heap0.link0.other6.cy2.rec2.pk3'
+
+So the whole path is proven on hardware: `lib/wedge.py` journals on the board → `remote.py` emits
+`wedge=` on the poll → `/device/poll` accepts it → `recordObserved` stores it → `buildStateSnapshot`
+relays it → `/api/state`. And the tally is not a placeholder: 6 classified poll failures, 2 radio
+cycles attempted, **2 recovered**, peak run 3 — the deaf-radio wedge is occurring and the deferred
+cycle is recovering it about as often as it fires.
