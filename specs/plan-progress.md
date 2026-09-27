@@ -637,3 +637,87 @@ works whenever the radio has a window, but nothing yet predicts the window. Driv
 REPL needs `mpremote`'s Ctrl-C to land, which it does not while `main.py` is looping; a direct
 pyserial `Ctrl-C` + `Ctrl-D` (and a raw-REPL peek) does, and the armed 8 s watchdog then resets the
 board a few seconds later — the soft reset that lands an update.
+
+## A release now gets several boots, and the updater finally went over USB (2026-09-27, session 4)
+
+**The rollback fragility is fixed — priority #1.** The old protocol rolled a release back on the
+*first* boot where `_recover` saw `boot-try == version` and `boot-ok != version`. One bad boot was
+enough, and a boot that merely *looked* bad (a slow radio join, an in-loop update that applied, a
+Ctrl-C) could cost a perfectly good release. The rule now gives it several:
+
+| constant | value | meaning |
+| --- | --- | --- |
+| `BOOT_FAILS_MAX` | 3 | judged boots a release gets before rollback |
+| `boot-fails.txt` | counter | spent one per judged boot, cleared on proof / rollback |
+
+`_mark_attempt` (which runs in `updater.run()`'s `finally`, so it is counted on every boot path)
+spends one boot; `_recover` only rolls back once the counter has reached `BOOT_FAILS_MAX`; the proven
+path and `_rollback` both clear it. `tests/test_recover.py` drives the real `_recover`/`_mark_attempt`
+pair across boots and asserts the rollback lands at `MAX + 1` (and that a late `boot-ok` still keeps
+the release). Merged **a2075b6** → **1ded1a3**, Buildkite **#60 green**, Release cut **v0.1.36**
+(`main.py` is in the pack, so the hash changed).
+
+**`lib/updater.py` is excluded from the pack, so the fix could not be delivered over OTA — it had to
+go over USB.** This is the deploy that had been failing for two sessions: `mpremote` cannot interrupt
+`main.py`'s loop (its Ctrl-C does not land), and every pyserial approach fought an 8 s hardware fuse
+— `main.py` feeds the watchdog from the render loop, Ctrl-C stops that loop, and the fuse fires
+~6–8 s later, usually mid-transfer.
+
+**The lever that unsticks it: a feeder thread.** In the REPL, start a `_thread` that pets the fuse,
+and the window is gone:
+
+```
+import _thread, machine, time
+def _feed():
+    w = machine.WDT(timeout=8000)
+    while True:
+        w.feed()
+        time.sleep(0.4)
+_thread.start_new_thread(_feed, ())
+```
+
+Measured: a 12 s sleep in the REPL after starting it returned `ALIVE_AFTER_12S` — no reset. With that,
+`/tmp/push.py` writes the file as 18 idempotent `:up_N` chunks (`wb`, so a retried chunk cannot
+double-append — the old lost-ack bug is impossible by construction), concatenates on the board,
+streams a sha256 over the result, and only on a match does `os.rename(':updater.new', 'lib/updater.py')`
+and sweep. Two heap lessons from the first attempts: `hashlib.sha256(open(f).read())` on a 27 KB file
+raises `MemoryError` even with a healthy `gc.mem_free()` — the hash must be streamed in 1 KB reads —
+and this MicroPython's `hashlib` has no `hexdigest()`, so it is `ubinascii.hexlify(h.digest())`.
+
+**Landed and verified on the board:**
+
+| check | result |
+| --- | --- |
+| board-concat sha | `430de2fd…` == host sha |
+| `lib/updater.py` after rename | `430de2fd…` (was `71a3284e…`) |
+| `updater.BOOT_FAILS_MAX` | `3` — the new constant is live |
+| `:up_*` / `:updater.new` | `leftover_ups 0`, `tmp_left False` |
+| free | 225280 → **450560** (53 stale chunk files swept) |
+| boot after | `fw=0.1.36`, `boot-ok=0.1.36`, `boot-try`/`boot-fails` absent |
+
+So the temp-file cleanup and the deploy were the same pass, and the board was left running normally
+(`update: no update: 0.1.36 is already running`, watchdog armed at 8000 ms).
+
+**Also fixed: a successful in-loop update was being written up as a crash.** An apply calls
+`updater._reset()` → `machine.soft_reset()`, which asks for the reboot by *raising* `SystemExit`.
+`boot.py` had a clause for that; `main.py` did not, so every successful in-loop apply fell into the
+`BaseException` handler and wrote `crash.log` with `File "/lib/updater.py", line 370, in _reset /
+SystemExit:` — poisoning the one file kept for finding out why the loop really died. Fixed in
+**77113cf**, which re-raises rather than swallowing, and that difference is measured, not assumed:
+
+```
+>>> try: machine.soft_reset()
+... except SystemExit: print('CAUGHT')
+CAUGHT
+>>>          # still at the REPL — catching SystemExit CANCELS the reboot
+```
+
+`boot.py` can swallow it because `boot.py` then falls through and runs the freshly-applied `main.py`;
+in `main.py` there is nothing after the block, so swallowing would cancel the reboot, end the module
+and leave the board at the REPL with the loop gone (the watchdog hard-resetting it 8 s later).
+
+**Debt this session added to the list:** `boot.py`'s `except SystemExit: pass` still carries a comment
+saying the exception "asks for the reboot that starts the firmware it just applied" — measured, no
+reboot happens there; the fall-through to `main.py` is what runs the new tree (with `config` left
+stale in `sys.modules`, since only `main.py` is re-read). That comment needs a USB deploy to correct,
+so it is batched for the next one.
