@@ -721,3 +721,33 @@ saying the exception "asks for the reboot that starts the firmware it just appli
 reboot happens there; the fall-through to `main.py` is what runs the new tree (with `config` left
 stale in `sys.modules`, since only `main.py` is re-read). That comment needs a USB deploy to correct,
 so it is batched for the next one.
+
+**v0.1.37 taken over OTA and stuck** (the fix shipped from CI, not from this desk). The Release
+step cut **v0.1.37** (`firmware.pack: 174992 bytes, 16 files`, and `main.py` is in the pack list —
+`boot.py`/`lib/updater.py` are not). The service's manifest cache rolled over to the new release and
+the board's boot check applied it while the radio had a window:
+
+```
+update: applied 0.1.37 (174992 bytes, 16 files)
+unicorn: BOOT galactic-unicorn / rp2040 fw=0.1.37
+```
+
+The download took ~12 s — over the 8 s fuse — which is why `_download` feeds the watchdog. Read back
+after the soak and then after the next boot (which ran `_recover`):
+
+| marker | first read | after next boot |
+| --- | --- | --- |
+| `version.txt` | 0.1.37 | 0.1.37 |
+| `boot-ok.txt` | 0.1.37 | 0.1.37 |
+| `boot-try.txt` | 0.1.37 | **absent** — `_recover` cleared it |
+| `:prev/`, `prev.json` | present (4 top-level: 3 files + `lib/`) | **absent** — slot dropped |
+| free | 204800 | **446464** |
+
+So the release proved itself on the following boot and gave its ~170 KB back: the protocol working as
+designed, on hardware, for a release shipped through CI.
+
+One caveat on the SystemExit fix, for the record: it cannot be hardware-verified yet. The board that
+applied 0.1.37 in-loop-on-boot was still running **0.1.36's** `main.py`, so the handler that would
+have written the false `crash.log` was the *old* one. The fix protects applies made *by* 0.1.37+, so
+the first real exercise is the next release applied by a running 0.1.37 (its in-loop check), and the
+signal to look for is a clean reboot with `crash.log` left absent.
