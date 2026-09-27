@@ -38,13 +38,22 @@
  * starts nothing and the service behaves exactly as before.
  */
 
-import dgram from "node:dgram";
+import net from "node:net";
 
 import { appendAudit } from "./audit.js";
 import { config } from "./config.js";
 import { getLiveness, nowEpochS } from "./state.js";
 
-/** TP-Link's fixed UDP port for the HS100/Kasa "legacy" protocol. */
+/**
+ * TP-Link's fixed port for the HS100/Kasa protocol.
+ *
+ * This plug (HS100(US) hw 1.0, sw 1.2.6) speaks the protocol over **TCP**, not
+ * UDP: 9999 accepts a TCP connection and replies to the same 4-byte-length +
+ * XOR frame, while UDP/9999 and the 20002 discovery port stay silent. Verified
+ * 2026-09-27 from both mac-studio and this service's container (routing to
+ * 192.168.1.0/24 works from the container). Sending the frame over TCP is the
+ * only framing that gets an answer, so the transport is TCP.
+ */
 export const KASA_PORT = 9999;
 
 /**
@@ -107,6 +116,24 @@ export function parseKasaResponse(buf) {
 }
 
 /**
+ * Try to read one complete frame out of an accumulating TCP receive buffer.
+ *
+ * TCP is a stream: the 4-byte length header and the body can arrive split
+ * across `data` events, so the caller buffers until this says `complete`. Pure,
+ * so the split-frame case is unit-testable without a socket.
+ *
+ * @param {Buffer} buf
+ * @returns {{complete: false, need: number} | {complete: true, value: object}}
+ */
+export function tryReadKasaFrame(buf) {
+  if (buf.length < 4) return { complete: false, need: 4 - buf.length };
+  const len = buf.readUInt32BE(0);
+  if (buf.length < 4 + len)
+    return { complete: false, need: 4 + len - buf.length };
+  return { complete: true, value: parseKasaResponse(buf.subarray(0, 4 + len)) };
+}
+
+/**
  * The relay command. `state` is 1 for on, 0 for off.
  *
  * @param {boolean} on
@@ -157,20 +184,25 @@ export function decideWedgeAction({
   return { action: "cycle", reason: "quiet-past-threshold" };
 }
 
-/** Send one command to the plug and resolve with its parsed reply. */
-function kasaCommand(command, { host, port = KASA_PORT, timeoutMs = 4000 }) {
+/**
+ * Send one command to the plug and resolve with its parsed reply.
+ *
+ * TCP, so the reply must be reassembled from the stream: connect, write the
+ * framed command, then accumulate `data` until a whole frame is present.
+ */
+export function kasaCommand(
+  command,
+  { host, port = KASA_PORT, timeoutMs = 4000 },
+) {
   return new Promise((resolve, reject) => {
-    const socket = dgram.createSocket("udp4");
+    const socket = net.createConnection({ host, port });
     let settled = false;
+    let buf = Buffer.alloc(0);
     const finish = (err, value) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try {
-        socket.close();
-      } catch {
-        /* already closed */
-      }
+      socket.destroy();
       if (err) reject(err);
       else resolve(value);
     };
@@ -179,17 +211,12 @@ function kasaCommand(command, { host, port = KASA_PORT, timeoutMs = 4000 }) {
       timeoutMs,
     );
     socket.once("error", (err) => finish(err));
-    socket.once("message", (msg) => {
-      try {
-        finish(null, parseKasaResponse(msg));
-      } catch (err) {
-        finish(err);
-      }
+    socket.on("data", (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      const res = tryReadKasaFrame(buf);
+      if (res.complete) finish(null, res.value);
     });
-    const buf = buildKasaCommand(command);
-    socket.send(buf, 0, buf.length, port, host, (err) => {
-      if (err) finish(err);
-    });
+    socket.once("connect", () => socket.write(buildKasaCommand(command)));
   });
 }
 

@@ -16,6 +16,7 @@ import {
   kasaEncrypt,
   parseKasaResponse,
   relayCommand,
+  tryReadKasaFrame,
 } from "./powercycle.js";
 
 describe("kasa cipher", () => {
@@ -52,6 +53,37 @@ describe("kasa framing", () => {
     expect(relayCommand(false)).toEqual({
       system: { set_relay_state: { state: 0 } },
     });
+  });
+});
+
+describe("tryReadKasaFrame (TCP reassembly)", () => {
+  // A real reply, framed the way the plug frames one: length, then body.
+  const reply = { system: { set_relay_state: { err_code: 0 } } };
+  const frame = buildKasaCommand(reply);
+
+  it("returns the parsed value once a whole frame has arrived", () => {
+    expect(tryReadKasaFrame(frame)).toEqual({ complete: true, value: reply });
+  });
+
+  it("asks for more when the length header is itself split", () => {
+    expect(tryReadKasaFrame(frame.subarray(0, 2))).toEqual({
+      complete: false,
+      need: 2,
+    });
+  });
+
+  it("asks for the missing tail when the body arrives in pieces", () => {
+    const half = 4 + Math.floor((frame.length - 4) / 2);
+    const res = tryReadKasaFrame(frame.subarray(0, half));
+    expect(res.complete).toBe(false);
+    expect(res.need).toBe(frame.length - half);
+    // …and completes when the rest of the stream shows up.
+    expect(tryReadKasaFrame(frame)).toEqual({ complete: true, value: reply });
+  });
+
+  it("ignores trailing bytes past the declared frame", () => {
+    const padded = Buffer.concat([frame, Buffer.from([1, 2, 3])]);
+    expect(tryReadKasaFrame(padded)).toEqual({ complete: true, value: reply });
   });
 });
 
