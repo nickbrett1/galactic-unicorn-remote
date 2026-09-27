@@ -885,3 +885,42 @@ board can classify its own failures, so the service relays the string rather tha
 the summary shape, the recovery line, the byte cap, and never-raises), picked up automatically by the
 CI glob; 13/13 firmware test files pass. `ruff`/`pytest` green expected on the pipeline. The service
 side adds one accepted param and two tests (164/164). Firmware on main `60dc536`.
+
+## Multi-boot rollback: verified on real hardware (2026-09-27, session 6)
+
+The last firmware behaviour that existed only as host tests. `tests/test_recover.py` drives the real
+`_recover`/`_mark_attempt` pair 8/8, but no board boot had ever been forced to fail `BOOT_FAILS_MAX`
+times, so the counting and the `MAX+1` rollback were unproven on the device.
+
+The test laid out a genuine protocol state on the board and let the board heal itself:
+
+  * `:prev/main.py` + `prev.json` held the board's **own** running `main.py` (sha `951ab68…`, the same
+    bytes the service mirror serves), so the tree the rollback lands is genuinely runnable;
+  * `version.txt=0.1.38`, `boot-ok.txt=0.1.37` — a "pending" release that has NOT proved itself;
+  * `main.py` was replaced with a **poison** release: it appends its state to `rb_trace.log`, arms the
+    8 s watchdog and hangs, so the board resets ITSELF with no one touching it (each reset is
+    `reset_cause=3`, a WDT hard reset);
+  * `UPDATE_MANIFEST_URL` was pointed at a dead port for the window — the mirror still reports
+    `0.1.37`, so a live fetch would downgrade-apply over the test. Recovery (phase 1) runs regardless.
+
+The durable per-boot trace (immune to the USB re-enumeration each reset causes) came back:
+
+    POISON_BOOT version.txt=0.1.38 boot-ok.txt=0.1.37 boot-try.txt=0.1.38 boot-fails.txt=1
+    POISON_BOOT version.txt=0.1.38 boot-ok.txt=0.1.37 boot-try.txt=0.1.38 boot-fails.txt=2
+    POISON_BOOT version.txt=0.1.38 boot-ok.txt=0.1.37 boot-try.txt=0.1.38 boot-fails.txt=3
+
+i.e. the release ran three judged boots, the counter advancing one per boot exactly as
+`_mark_attempt` intends, and never wrote `boot-ok`. The **next** boot rolled back:
+
+    update: rolled back from 0.1.38 (it did not come up in 3 boots) to 0.1.37
+
+and came up as the good `main.py` (`unicorn: BOOT … fw=0.1.37`, `reset_cause=3`). Final durable state
+matches every branch: `version=0.1.37`, `boot-ok=0.1.37` (proven again by the restored loop's soak),
+`boot-try.txt`/`boot-fails.txt` **gone**, `:prev`/`prev.json` **gone**, no `bad.txt` (no blacklist).
+Board restored: `config.py` re-read, test files removed, `main.py` sha `951ab68…`, 472 KB free, no
+leftover `:up_*`/`:main*` temp files.
+
+So the boot-side sequence — `boot.py` → `updater.run()` → `_recover()` (phase 1, before any network)
+→ `_mark_attempt()` in the `finally` — is now proven end to end on the device, across real resets,
+for the decision that matters: a flaky first boot is survived, and a release that cannot prove itself
+on `BOOT_FAILS_MAX` boots is rolled back on the boot after.
