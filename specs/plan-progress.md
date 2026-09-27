@@ -829,6 +829,26 @@ throwaway vitest probe drove `kasaCommand` against the real plug from the servic
 with safe defaults, because Compose passes nothing it is not told to and the arming has to be a
 NAS-side `.env` change.
 
-**Still to arm it:** set `POWER_CYCLE_ENABLED=1` and `KASA_HOST=192.168.1.66` in the NAS project's
-`.env` and redeploy. Off-hold-on is proven in unit tests but not yet exercised against this plug — a
-one-shot `powerCycle` against it is the last check before trusting it.
+**Arming it** was a two-line change once the address was known — see below.
+
+### Armed (2026-09-27, same session)
+
+The write path was proven without cutting power first: `relayCommand(true)` sent to the already-on
+plug returned `{"system":{"set_relay_state":{"err_code":0}}}` and `relay_state` stayed `1` — the exact
+command `powerCycle()` sends, accepted and a no-op. Then it was armed on the NAS.
+
+- main got the fix (merge `3030a36`); Buildkite **#44 passed** (`build` → `docker_smoke` →
+  `docker_publish`) and published `ghcr.io/nickbrett1/galactic-unicorn-remote:latest` at 19:10:48 UTC.
+- The NAS project `/volumeUSB1/usbshare/docker/galactic-unicorn-remote` (a plain compose project, not
+  a git checkout) had its `environment:` block and `.env` set for the watchdog, then was recreated:
+  container env now carries `POWER_CYCLE_ENABLED=1`, `KASA_HOST=192.168.1.66`, `KASA_PORT=9999`,
+  `POWER_CYCLE_STALE_S=180`, `POWER_CYCLE_COOLDOWN_S=600`, `POWER_CYCLE_MAX=2`,
+  `POWER_CYCLE_OFF_MS=5000`, `POWER_CYCLE_CHECK_MS=15000`, with `DEVICE_TOKEN` intact.
+- Startup logs `[powercycle] watching: cycle 192.168.1.66 after 180s quiet, cool-down 600s, max
+  2/wedge`; `/health` is `{"status":"ok"}`.
+- The container image ID (`sha256:ab08f758…`) **equals** the published `latest` (built 19:10:48,
+  recreated 19:18:44), so it is the TCP build and not a stale pull.
+
+So the last-resort recovery is live and watching. It stays a no-op until the board is silent for 180 s;
+the first genuine wedge is the first real exercise, and the `wedge went quiet` / `wedge recovered`
+edges it writes to the audit log are the instrumentation to read afterwards.
