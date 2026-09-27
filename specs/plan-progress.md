@@ -966,3 +966,63 @@ So the whole path is proven on hardware: `lib/wedge.py` journals on the board �
 relays it → `/api/state`. And the tally is not a placeholder: 6 classified poll failures, 2 radio
 cycles attempted, **2 recovered**, peak run 3 — the deaf-radio wedge is occurring and the deferred
 cycle is recovering it about as often as it fires.
+
+### The in-loop SystemExit fix, verified on hardware (2026-09-27, session 6)
+
+`main.py` gained an `except SystemExit:` clause in `77113cf` (shipped in v0.1.37) so that an update
+which applies *while the loop is running* — `check_for_update` → `_update` → `_reset` →
+`machine.soft_reset()`, which asks for the reboot by RAISING `SystemExit` — is not written up by the
+`BaseException` handler as "MAIN DIED". It was never exercised on hardware: 0.1.38 was applied by
+`boot.py`, which has had its own `SystemExit` clause since the beginning. This is the task that was
+left open, and it is now done.
+
+**Method.** Staged a synthetic release on the LAN mirror and let the *running loop* pick it up, so
+`boot.py` never touches it — no reboot from us, no GitHub release, no firmware change. Used the
+service's documented operator escape hatch: `FIRMWARE_LOCAL_DIR=/fwstage` (plus a `:ro` bind mount)
+makes `/firmware/*` read from disk instead of mirroring the release. The manifest's version was
+bumped so the board's in-loop check finds `version != local`; the pack was built from the real 0.1.38
+pack, so the applied bytes are identical to what is running.
+
+**Observed — twice, independently** (second run after clearing a stale `crash.log`), on the console:
+
+    update: applied 0.1.99 (897 bytes, 1 files)
+    unicorn: reboot to finish an update - not a crash, crash.log left alone
+    MPY: soft reboot
+    update: no update: 0.1.99 is already running
+    unicorn: BOOT galactic-unicorn / rp2040 fw=0.1.99
+
+and then the same for `0.1.100`. No `MAIN DIED` on either. **`crash.log` is ABSENT** — the assertion
+holds on real hardware. (Before the repeat, a *stale* `crash.log` from the `config.py`=0-bytes
+incident was present; its content was that `AttributeError`, not a `SystemExit`, so the in-loop apply
+had never written it — but it was deleted first so the check is judged against a clean slate.)
+
+**Restored.** The applied label was synthetic and the pack carried only `routines.json`
+(byte-identical), so the tree was genuine 0.1.38 throughout. Afterwards: `version.txt`/`boot-ok.txt`
+back to `0.1.38`, the test's rollback slot and counters cleared, and `main.py` / `config.py` /
+`lib/wedge.py` re-hashed against the 0.1.38 manifest (`951ab681…` / `8d876b70…` / `1f266b56…`) — all
+match. The mirror was returned to upstream (`FIRMWARE_*` removed, `fwstage/` deleted, serves 0.1.38).
+
+### …and the reason it took narrowing: a real bug, the in-loop check OOMs on a full release
+
+With the real 17-file release staged, the in-loop check failed **three times in a row**, identically:
+
+    update: update check failed, keeping current firmware:
+    MemoryError('memory allocation failed, allocating 4352 bytes',)
+
+It is not the manifest text: a 2377-byte manifest and an 1854-byte *minified* one both failed with the
+**same 4352 bytes**, while a 250-byte manifest + 897-byte pack applied cleanly. So the allocation
+tracks the pack / file set, not the manifest size. Consequence: **in-loop OTA of a real release is
+effectively broken on this board** — only `boot.py`'s check (fresh heap, ~120 KB free, no live display
+yet) can apply a full release, which is exactly why the `SystemExit` clause went unnoticed for
+releases. `_run_update_check` already `gc.collect()`s before the fetch, so this is not the documented
+fragmentation fix, half-done.
+
+Next step to pin it: `check_for_update` logs only `repr(exc)`, so the traceback must come from a
+USB-deployed `lib/updater.py` (excluded from the pack, so no OTA needed). Prime suspects, both run
+only for a multi-file release and both absent from the 1-file case that succeeded: `_archive_current`
+reads every managed file **whole** into RAM (`data = fh.read()`; the biggest packed files are
+`main.py` 29968 B, `remote.py` 27629 B, `net.py` 24824 B), and `_unpack` builds a 17-entry expected
+map. 4352 matches no packed file size exactly, so the allocation is still unpinned. Also noted while
+watching: the deaf-radio wedge (`OSError(110)`/`(104)`, `isconnected()` True with a valid lease)
+drives the deferred cycle every few minutes, and the first `_attach_remote` after a boot can still
+`MemoryError` at 640 bytes before the built-in retry recovers it.
