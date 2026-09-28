@@ -124,6 +124,12 @@ const PARTLY = [
 // The cloud is the one shaded glyph, and the one glyph wider than the row
 // (22 px): a wide silhouette of uneven terraces, lit on top and shadowed
 // underneath, with a quiet grey rim on the flanks.
+//
+// The underside shade is a LENS, not a band. It used to fill the bottom two
+// rows edge to edge, which read as a slab the cloud was sitting on; the shade
+// now steps outward as it descends (4 cells, then 8, then 16 in a 20-cell
+// base) and stops short of the silhouette on every row, so the flanks stay
+// body ink. Transcribed from `lib/icons.py` `_CLOUD` - see the note there.
 const CLOUD = [
   "......................",
   "......................",
@@ -132,9 +138,9 @@ const CLOUD = [
   "...OXXXXLO..LLLLLLL...",
   "...OXXXXXXLLLLXXXLO...",
   "LLLXXXXXXXLLXXXXXXXLLL",
-  "OLLXXXXXXXXXXXXXXXXLLO",
-  ".SSSSSSSSSSSSSSSSSSSS.",
-  ".SSSSSSSSSSSSSSSSSSSS.",
+  "OLLXXXXXXSSSSXXXXXXLLO",
+  ".XXXXXXSSSSSSSSXXXXXX.",
+  ".XXSSSSSSSSSSSSSSSSXX.",
   "......................",
 ];
 
