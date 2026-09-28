@@ -26,6 +26,8 @@ GET /device/poll
       &uptime_s=<n>
       &wedge=<tally>                         # the board's own failure tally
       &reset_cause=<n>                       # how the PREVIOUS boot ended
+      &temp_c=<n>                            # whole degrees C, sent WITH condition
+      &condition=<sun|partly|cloud|fog|rain|snow|thunder>   # the board's own sky
 ```
 
 ```jsonc
@@ -101,7 +103,8 @@ countdown, the *server* orchestrates cancel → wait → start.
 { "boot": "9f3c1a22", "fw": "0.2.0", "applied_gen": 18,
   "state": "countdown", "routine": "bathtime", "remaining_s": 214,
   "rssi": -41, "uptime_s": 3820,
-  "wedge": "heap0.link0.other0.cy0.rec0.pk0", "reset_cause": 1 }
+  "wedge": "heap0.link0.other0.cy0.rec0.pk0", "reset_cause": 1,
+  "temp_c": 18, "condition": "partly" }
 ```
 
 - **`gen` is a monotonic counter both sides agree on** (memo §5.1). The board persists `applied_gen`
@@ -122,6 +125,17 @@ countdown, the *server* orchestrates cancel → wait → start.
   board cannot shout over, so a field carried back on the next **successful** poll is the only way
   either one is ever visible from off-board; without it, telling a cold start from a watchdog reset
   needs a USB console, and a panel that is powered from a smart plug has no console port left.
+
+- **`temp_c` and `condition` are the idle screen's weather, relayed verbatim.** The board polls
+  Open-Meteo itself (`lib/weather.py`), classifies a WMO code into one of seven conditions, and
+  reports the reading it is drawing. The service **must not** call a weather API of its own: a page
+  and a panel each fetching their own could disagree about a sky that is only happening once, so the
+  reading is carried on the poll the board already makes and merely passed through. The two travel as
+  a **pair** — a temperature with no condition has no glyph behind it, and a condition with no
+  temperature has no number — so a lone half is a `422` naming the missing field, and both absent is
+  the normal "the board has no reading yet", not a failure. The remote page and the Homepage tile
+  render the same indicator from the same relayed pair (and the same glyph masks as the firmware), so
+  neither can drift from the panel.
 
 ### 3.1 Restart safety, both directions
 

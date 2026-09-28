@@ -15,6 +15,7 @@
     mirrorHeadline,
     stateWord,
   } from "$lib/ui/format.js";
+  import WeatherIndicator from "$lib/ui/WeatherIndicator.svelte";
 
   let { data } = $props();
 
@@ -154,6 +155,13 @@
         />
         <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
       </svg>
+      <!-- The same reading the panel draws on its idle screen, from the same
+           component and the same firmware masks as `/` (design-system.md §9).
+           Idle only, and no reading renders nothing. -->
+      <WeatherIndicator
+        condition={snapshot.panel?.condition}
+        tempC={snapshot.panel?.temp_c}
+      />
     {:else}
       <p class="headline">{headline.text}</p>
     {/if}

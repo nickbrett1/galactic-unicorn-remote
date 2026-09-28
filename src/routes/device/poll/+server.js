@@ -36,6 +36,7 @@ import {
   seedGenFromBoard,
   setDesired,
 } from "../../../lib/server/state.js";
+import { WEATHER_CONDITIONS } from "../../../lib/ui/weather.js";
 
 const MAX_STRING = 16;
 
@@ -46,6 +47,45 @@ const MAX_STRING = 16;
  * room for a port that adds one, not a guess at the vocabulary.
  */
 const RESET_CAUSE_MAX = 15;
+
+/**
+ * The idle screen's weather (firmware `lib/weather.py`) arrives as a PAIR:
+ * `temp_c` (whole degrees, and genuinely below zero some mornings) and
+ * `condition` (one of the seven glyph names the board can draw). Both bounds
+ * are generous room around the worst the weather can do — -100 °C is colder
+ * than anywhere that has a panel, 100 °C hotter — not a claim about the
+ * vocabulary, which is pinned by `WEATHER_CONDITIONS`.
+ */
+const WEATHER_TEMP_MIN = -100;
+const WEATHER_TEMP_MAX = 100;
+
+/**
+ * Read the optional weather reading — `temp_c` and `condition` — as a PAIR.
+ *
+ * Rationale belongs with the contract: the board only sends the two together
+ * (a temperature with no condition has no glyph behind it, a condition with no
+ * temperature has no number), so a HALF-PAIR is malformed and a 422 names the
+ * field that is MISSING. Both absent is the normal "the board has no reading
+ * yet" state, not a failure — that is why absence never 422s.
+ *
+ * @param {URLSearchParams} params
+ * @param {object} report
+ * @returns {string|null} the offending parameter name, or null
+ */
+function readWeather(params, report) {
+  const rawCondition = params.get("condition");
+  const rawTemp = params.get("temp_c");
+  if (rawCondition === null && rawTemp === null) return null;
+  // Name the field that should have been there, never echoing either value.
+  if (rawCondition === null) return "condition";
+  if (rawTemp === null) return "temp_c";
+  if (!WEATHER_CONDITIONS.includes(rawCondition)) return "condition";
+  const temp = intInRange(rawTemp, WEATHER_TEMP_MIN, WEATHER_TEMP_MAX);
+  if (temp === null) return "temp_c";
+  report.temp_c = temp;
+  report.condition = rawCondition;
+  return null;
+}
 
 /** Strict integer: optional leading '-', digits only. Returns null when invalid. */
 function parseIntStrict(raw) {
@@ -157,6 +197,14 @@ function parsePollReport(params) {
     RESET_CAUSE_MAX,
   );
   if (causeBad !== null) return { ok: false, detail: causeBad };
+
+  // The idle screen's weather (firmware lib/weather.py), relayed verbatim like
+  // wedge and reset_cause: the board polls Open-Meteo itself and reports the
+  // reading it is drawing, so the page and the panel cannot disagree. The
+  // service never asks a weather API of its own. Both fields together or
+  // neither; a half-pair is a 422 naming the missing field.
+  const weatherBad = readWeather(params, report);
+  if (weatherBad !== null) return { ok: false, detail: weatherBad };
 
   return { ok: true, report };
 }

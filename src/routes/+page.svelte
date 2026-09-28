@@ -14,6 +14,7 @@
   import { onMount, untrack } from "svelte";
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
+  import WeatherIndicator from "$lib/ui/WeatherIndicator.svelte";
 
   let { data } = $props();
 
@@ -254,6 +255,14 @@
         />
         <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
       </svg>
+      <!-- The idle panel is also the panel's weather screen, so the same
+           reading the hardware is drawing is shown here (idle only — a
+           countdown draws the routine, not the sky). No reading renders
+           nothing (firmware lib/weather.py, design-system.md §9). -->
+      <WeatherIndicator
+        condition={snapshot.panel?.condition}
+        tempC={snapshot.panel?.temp_c}
+      />
     {:else}
       <p class="routine">{headline.text}</p>
     {/if}

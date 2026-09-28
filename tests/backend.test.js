@@ -103,6 +103,14 @@ describe("/device/poll — auth and validation", () => {
       { reset_cause: "-1" },
       { reset_cause: "16" },
       { reset_cause: "abc" },
+      // the weather pair: a lone half, an unknown condition, a bad temperature
+      { temp_c: "18" },
+      { condition: "sun" },
+      { condition: "hail", temp_c: "18" },
+      { condition: "sun", temp_c: "abc" },
+      { condition: "sun", temp_c: "3.5" },
+      { condition: "sun", temp_c: "-101" },
+      { condition: "sun", temp_c: "101" },
     ];
     for (const override of cases) {
       const res = poll({ url: pollUrl(override) });
@@ -148,6 +156,49 @@ describe("/device/poll — auth and validation", () => {
       const res = poll({ url: pollUrl({ reset_cause: raw }) });
       expect(res.status, raw).toBe(422);
     }
+  });
+
+  it("relays the board's weather pair verbatim, negatives included", async () => {
+    const res = poll({ url: pollUrl({ condition: "snow", temp_c: "-7" }) });
+    expect(res.status).toBe(200);
+    // Stored on the observed slot, unparsed: the board read the sky, the
+    // service only passes the reading through (`device-protocols.md` §3).
+    expect(getObserved().condition).toBe("snow");
+    expect(getObserved().temp_c).toBe(-7);
+  });
+
+  it("accepts every condition name and the generous temperature bounds", async () => {
+    const names = ["sun", "partly", "cloud", "fog", "rain", "snow", "thunder"];
+    for (const condition of names) {
+      expect(
+        poll({ url: pollUrl({ condition, temp_c: "-100" }) }).status,
+        condition,
+      ).toBe(200);
+      expect(
+        poll({ url: pollUrl({ condition, temp_c: "100" }) }).status,
+        condition,
+      ).toBe(200);
+    }
+  });
+
+  it("422s a half weather pair, naming the field that is missing", async () => {
+    // A temperature with no condition has no glyph behind it; a condition with
+    // no temperature has no number. Both are malformed, and the detail names
+    // the missing field (never an echoed value).
+    const noCondition = poll({ url: pollUrl({ temp_c: "18" }) });
+    expect(noCondition.status).toBe(422);
+    expect((await noCondition.json()).detail).toBe("condition");
+
+    const noTemp = poll({ url: pollUrl({ condition: "sun" }) });
+    expect(noTemp.status).toBe(422);
+    expect((await noTemp.json()).detail).toBe("temp_c");
+  });
+
+  it("accepts a poll with no weather at all (no reading is normal)", async () => {
+    const res = poll({ url: pollUrl({}) });
+    expect(res.status).toBe(200);
+    expect(getObserved()).not.toHaveProperty("condition");
+    expect(getObserved()).not.toHaveProperty("temp_c");
   });
 
   it("seeds gen = applied_gen + 1 on the first poll (R6) and returns a tiny body", async () => {
@@ -464,6 +515,23 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
       "cleanup",
     ]);
     expect(body.door).toEqual({ kind: "tunnel", email: "ts.akhtar@gmail.com" });
+  });
+
+  it("relays the panel's weather pair into the snapshot", async () => {
+    poll({ url: pollUrl({ condition: "rain", temp_c: "9" }) });
+    const body = await getState({ locals: { door: TUNNEL } }).json();
+    // The same reading the panel is drawing, passed straight through.
+    expect(body.panel.condition).toBe("rain");
+    expect(body.panel.temp_c).toBe(9);
+  });
+
+  it("omits the weather fields when the board has no reading", async () => {
+    poll({ url: pollUrl({}) });
+    const body = await getState({ locals: { door: TUNNEL } }).json();
+    // Absent, not null: "no reading" is a normal state, and the UI renders
+    // nothing for it rather than a placeholder.
+    expect(body.panel).not.toHaveProperty("condition");
+    expect(body.panel).not.toHaveProperty("temp_c");
   });
 
   it("reads an empty desired slot as action 'none'", async () => {
