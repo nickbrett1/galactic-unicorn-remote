@@ -1202,3 +1202,25 @@ most likely this same planted latch. The wedge tally in that window shows the ra
 
 `lib/updater.py` still needs one more USB deploy so the board's copy matches HEAD (`28d3438` adds
 only a `# noqa: SIM115` and its reason); behaviour is identical.
+
+## The planted latch retired itself on the next clean boot (2026-09-28, session 8)
+
+The console-plants-a-latch reading was left as probable, not proven, because the earlier ordering could
+not be reconstructed. It is proven now, by the board saying so unprompted. With the USB cable handed
+back to the Kasa plug - no console attached, no Ctrl-C anywhere near the render loop - the board's next
+boot reports `reset_cause=1`, `PWRON_RESET`, on a brand-new boot id:
+
+    boot=2e8ba5c0 fw=0.1.41 rc=1 uptime=105 online=True wedge=heap0.link0.other0.cy0.rec0.pk0
+    boot=2e8ba5c0 fw=0.1.41 rc=1 uptime=125 online=True wedge=heap0.link0.other0.cy0.rec0.pk0
+    boot=2e8ba5c0 fw=0.1.41 rc=1 uptime=145 online=True wedge=heap0.link0.other0.cy0.rec0.pk0
+
+Sampled through `/api/state` on the NAS. The same board, the same release, the same everything except
+the console - and the WDT residue is simply gone. `reset_cause` is a latch about the *previous* boot,
+so a console session's `3` is spent the moment a boot happens without one; the honest reading was
+always one power cycle away. Nothing about the render loop, the watchdog, or the radio was ever at
+fault, and the wedge tally stays all-zero across all three samples.
+
+The 0.1.41 that this boot is running is also the OTA-landed one, so the power cycle is the final proof
+that the release persisted: `version.txt` and `boot-ok.txt` survived plug power with the rollback slot
+already dropped. Both open items from this session are closed, and `lib/updater.py` on the board now
+matches HEAD (`0f68edcc…`, 43099 B, after `28d3438`), so no further USB deploy is outstanding.
