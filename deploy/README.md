@@ -73,6 +73,29 @@ image digest changes — no inbound ports from CI are required.
 - **Private packages**: `docker login ghcr.io` on the NAS host once
   (Watchtower uses the Docker daemon's credentials).
 
+### Which instance picks this up (the scope label)
+
+The house NAS runs **two** Watchtower instances, and they split the work:
+
+| instance          | trigger                                                 | sees                                                                 |
+| ----------------- | ------------------------------------------------------- | -------------------------------------------------------------------- |
+| `watchtower`      | `WATCHTOWER_SCHEDULE=0 0 3 * * *` — once a day at 03:00 | everything (no scope)                                                |
+| `watchtower-nick` | `WATCHTOWER_POLL_INTERVAL=60` — every 60 s              | only containers labelled `com.centurylinklabs.watchtower.scope=nick` |
+
+`enable=true` on its own does **not** enroll the container in the fast
+poller: with a scope configured, Watchtower filters on the scope label first,
+so an unscoped container is invisible to `watchtower-nick` and waits for the
+daily sweep — a push can therefore sit undeployed for up to ~24 h. The compose
+file carries **both** labels for that reason; the `scope=nick` label is inert
+on a host with a single unscoped Watchtower (the daemon ignores it when no
+scope is configured).
+
+Symptom of getting this wrong: the registry has a new `:latest`, the service
+still serves the old asset, `GET /api/state` looks stale, and `docker logs
+watchtower-nick` shows healthy `updated=0` cycles that never mention the
+container. `docker compose pull && docker compose up -d` fixes it once; the
+scope label fixes it for good.
+
 ## 4. Rolling back a bad update
 
 Watchtower recreates the container on every push to `main`, so a broken build

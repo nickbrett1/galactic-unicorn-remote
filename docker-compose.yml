@@ -47,3 +47,11 @@ services:
       # deploy/homepage-services.yaml) — the Docker auto-discovery provider
       # would otherwise add a *second*, health-only tile under "Services".
       - "com.centurylinklabs.watchtower.enable=true"
+      # The NAS runs TWO Watchtower instances: an unscoped one on a daily
+      # 03:00 schedule (`WATCHTOWER_SCHEDULE`), and a `nick`-scoped one
+      # polling every 60 s (`WATCHTOWER_SCOPE=nick`). Only containers carrying
+      # this scope label are seen by the fast poller; `enable=true` alone
+      # parks the container in the daily sweep, so a push can sit for hours.
+      # The label is inert and harmless on a host with a single unscoped
+      # Watchtower — the scope label is ignored when no scope is configured.
+      - "com.centurylinklabs.watchtower.scope=nick"
