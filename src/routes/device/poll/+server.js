@@ -39,22 +39,54 @@ import {
 
 const MAX_STRING = 16;
 
+/**
+ * The highest `machine.reset_cause()` this service will relay. MicroPython
+ * enumerates these on a small ladder (1 PWRON_RESET, 2 HARD_RESET, 3 WDT_RESET,
+ * 4 SOFT_RESET, 5 DEEPSLEEP_RESET), so a bound well above the ladder is generous
+ * room for a port that adds one, not a guess at the vocabulary.
+ */
+const RESET_CAUSE_MAX = 15;
+
 /** Strict integer: optional leading '-', digits only. Returns null when invalid. */
 function parseIntStrict(raw) {
   if (typeof raw !== "string" || !/^-?\d+$/.test(raw)) return null;
   return Number(raw);
 }
 
-function intAtLeast(raw, min) {
+/**
+ * Strict integer within [min, max] inclusive, or null when invalid.
+ * A null bound means "no bound on that side".
+ */
+function intInRange(raw, min, max) {
   const value = parseIntStrict(raw);
-  if (value === null || value < min) return null;
+  if (value === null) return null;
+  if (min !== null && value < min) return null;
+  if (max !== null && value > max) return null;
   return value;
 }
 
-function intAtMost(raw, max) {
-  const value = parseIntStrict(raw);
-  if (value === null || value > max) return null;
-  return value;
+/**
+ * Read an optional, STRICT integer query parameter into `report`.
+ *
+ * Returns the parameter NAME when it is present but malformed - so the caller
+ * can 422 naming it without echoing the value (memo §10) - or null when it was
+ * absent or accepted. The shared shape for every optional numeric parameter:
+ * absent is fine, present-but-invalid is a 422 that names the field.
+ *
+ * @param {URLSearchParams} params
+ * @param {string} name
+ * @param {object} report
+ * @param {number|null} min
+ * @param {number|null} max
+ * @returns {string|null} the offending parameter name, or null
+ */
+function readOptionalInt(params, name, report, min, max) {
+  const raw = params.get(name);
+  if (raw === null) return null;
+  const value = intInRange(raw, min, max);
+  if (value === null) return name;
+  report[name] = value;
+  return null;
 }
 
 function stringAtMost(raw, max) {
@@ -77,7 +109,7 @@ function parsePollReport(params) {
   const fw = stringAtMost(params.get("fw"), MAX_STRING);
   if (fw === null) return { ok: false, detail: "fw" };
 
-  const appliedGen = intAtLeast(params.get("applied_gen"), 0);
+  const appliedGen = intInRange(params.get("applied_gen"), 0, null);
   if (appliedGen === null) return { ok: false, detail: "applied_gen" };
 
   const state = params.get("state");
@@ -91,26 +123,14 @@ function parsePollReport(params) {
     report.routine = routine;
   }
 
-  const remainingRaw = params.get("remaining_s");
-  if (remainingRaw !== null) {
-    const value = intAtLeast(remainingRaw, 0);
-    if (value === null) return { ok: false, detail: "remaining_s" };
-    report.remaining_s = value;
-  }
+  const remainingBad = readOptionalInt(params, "remaining_s", report, 0, null);
+  if (remainingBad !== null) return { ok: false, detail: remainingBad };
 
-  const rssiRaw = params.get("rssi");
-  if (rssiRaw !== null) {
-    const value = intAtMost(rssiRaw, 0);
-    if (value === null) return { ok: false, detail: "rssi" };
-    report.rssi = value;
-  }
+  const rssiBad = readOptionalInt(params, "rssi", report, null, 0);
+  if (rssiBad !== null) return { ok: false, detail: rssiBad };
 
-  const uptimeRaw = params.get("uptime_s");
-  if (uptimeRaw !== null) {
-    const value = intAtLeast(uptimeRaw, 0);
-    if (value === null) return { ok: false, detail: "uptime_s" };
-    report.uptime_s = value;
-  }
+  const uptimeBad = readOptionalInt(params, "uptime_s", report, 0, null);
+  if (uptimeBad !== null) return { ok: false, detail: uptimeBad };
 
   // The board's own wedge tally (firmware lib/wedge.py), carried as an opaque
   // short string: heap/link/other failure counts, radio cycles attempted and
@@ -123,6 +143,20 @@ function parsePollReport(params) {
     if (value === null) return { ok: false, detail: "wedge" };
     report.wedge = value;
   }
+
+  // How the board's PREVIOUS boot ended (firmware `machine.reset_cause()`, the
+  // same latch `lib/updater.py` and `lib/wifihealth.py` read). A bounded
+  // integer, relayed uninterpreted: 1 is a cold start, 3 is the watchdog latch
+  // that used to need a USB console to see. The service stores the number; only
+  // the board knows its own reset vocabulary.
+  const causeBad = readOptionalInt(
+    params,
+    "reset_cause",
+    report,
+    0,
+    RESET_CAUSE_MAX,
+  );
+  if (causeBad !== null) return { ok: false, detail: causeBad };
 
   return { ok: true, report };
 }

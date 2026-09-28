@@ -54,6 +54,13 @@ export function buildStateSnapshot({
         // verbatim like remaining_s: only the board can classify its own
         // poll failures, so the server never parses or interprets it.
         ...(observed.wedge !== undefined ? { wedge: observed.wedge } : {}),
+        // How the board's PREVIOUS boot ended (firmware machine.reset_cause(),
+        // relayed verbatim like wedge): 1 is a cold start, 3 is the watchdog
+        // latch that used to need a USB console to see. The server stores the
+        // number and never interprets it.
+        ...(observed.reset_cause !== undefined
+          ? { reset_cause: observed.reset_cause }
+          : {}),
       }
     : { boot: null, fw: null, applied_gen: 0, state: "ambient" };
 

@@ -1026,3 +1026,55 @@ map. 4352 matches no packed file size exactly, so the allocation is still unpinn
 watching: the deaf-radio wedge (`OSError(110)`/`(104)`, `isconnected()` True with a valid lease)
 drives the deferred cycle every few minutes, and the first `_attach_remote` after a boot can still
 `MemoryError` at 640 bytes before the built-in retry recovers it.
+
+## The board is on the plug; `reset_cause` goes on the wire (2026-09-28, session 7)
+
+The board is now powered from the Kasa at `192.168.1.66` and **not** from the mac-studio, which
+retires the one caveat the watchdog carried from the start: with the USB cable in, VBUS diode-ORs
+into VSYS and the relay's off-window does nothing — the recovery would have been decorative for as
+long as the board was also on the bench.
+
+**A deliberate one-off cycle, and the plug is real.** The plug was driven through the same protocol
+`powercycle.js` uses (off → hold 5 s → on) and the board watched through `/api/state` every 2 s:
+
+    plug      relay_state 1 -> (OFF 02:23:19.8, ON 02:23:24.9) -> 1 ; on_time 5169 s -> 4 s
+    board     boot e7eebbf4 -> 57b3060c ; uptime_s 756 -> 0 ; online false for ~6 s at last_seen 23 s
+    firmware  0.1.40 before and after
+
+`on_time` resetting is the proof the relay genuinely toggled (a toggle on an already-on plug would
+have left it running), and the boot-id change with `uptime_s` back to 0 is a real cold boot, not a
+wifi rejoin — dead ~22 s end to end, ~17 s of that power-on to first poll. `fw` stayed 0.1.40, so it
+cold-booted onto the OTA-applied pack: the radio-recovery throttle is **live**, confirmed against the
+mirror (0.1.40's pack carries `config.py` and `lib/remote.py`; `boot.py` and `lib/updater.py` are
+still USB-only). Wedge tally after: `heap0.link0.other0.cy0.rec0.pk0`.
+
+One operational note worth keeping: a **manual** off-window longer than `POWER_CYCLE_STALE_S` (180 s)
+also reads as a wedge to the monitor, which cannot tell a bench test from a real one. Ad-hoc cycles
+stay under three minutes, as this one did.
+
+**The gap this exposed: `reset_cause` was not observable off-board.** It is not in the poll contract,
+and now that the plug occupies the only micro-USB port there is no console to read it on either — so
+"is the WDT latch cleared?" was unanswerable exactly when it started to matter. The fix is to let the
+board **say** it on the next successful poll, the same trick `lib/wedge.py` already uses to get its
+account of a quiet window across a radio that is broken.
+
+Firmware (`galactic-unicorn`): `remote._reset_cause()` reads `machine.reset_cause()` **once**, at
+`Remote.__init__` — it is a latch about the *previous* boot and cannot change while we run, so it is
+not re-read per poll; absence of the call is `None`, not an error. `reconcile.build_report` grew an
+optional `reset_cause` field on the existing reuse-safe pattern (cleared when not supplied, 0 kept as
+a value), and `poll_path` emits it when present. 5 new host tests: 3 in `tests/test_reconcile.py`
+(carried, zero-is-a-value, cleared on reuse) and 2 in `tests/test_remote.py` (path carries it, path
+omits it when unknown). Firmware suites green.
+
+Server: `/device/poll` accepts an optional, bounded `reset_cause` (0–15; MicroPython's ladder is
+1 PWRON, 2 HARD, 3 WDT, 4 SOFT, 5 DEEPSLEEP, so the bound is room, not a guess) and stores it
+verbatim; `buildStateSnapshot` relays it as `panel.reset_cause`; the type and the pinned contract are
+brought in line. While adding the optional-int parse the shared shape was factored into
+`readOptionalInt` (also folding `remaining_s`/`rssi`/`uptime_s`), which removed a
+`sonarjs/cognitive-complexity` warning rather than adding one. 2 new tests; 166/166.
+
+**Left honestly open.** (1) Whether the deaf-radio wedge was ever a real hardware state or partly an
+artefact of the USB console — every wedge seen in the debugging sessions followed a console
+interrupt, and the console is now gone, so the suspected trigger is no longer present. (2) The
+in-loop OTA of a *full* release still OOMs (previous entry); a firmware change therefore lands via
+`boot.py`'s check on a reboot, which is also the path 0.1.40 took.

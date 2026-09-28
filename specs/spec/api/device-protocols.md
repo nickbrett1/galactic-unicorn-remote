@@ -24,6 +24,8 @@ GET /device/poll
       &remaining_s=<n>                       # only in countdown/handoff
       &rssi=<dBm>
       &uptime_s=<n>
+      &wedge=<tally>                         # the board's own failure tally
+      &reset_cause=<n>                       # how the PREVIOUS boot ended
 ```
 
 ```jsonc
@@ -98,7 +100,8 @@ countdown, the *server* orchestrates cancel → wait → start.
 // the board reports on every poll (observed):
 { "boot": "9f3c1a22", "fw": "0.2.0", "applied_gen": 18,
   "state": "countdown", "routine": "bathtime", "remaining_s": 214,
-  "rssi": -41, "uptime_s": 3820 }
+  "rssi": -41, "uptime_s": 3820,
+  "wedge": "heap0.link0.other0.cy0.rec0.pk0", "reset_cause": 1 }
 ```
 
 - **`gen` is a monotonic counter both sides agree on** (memo §5.1). The board persists `applied_gen`
@@ -110,6 +113,15 @@ countdown, the *server* orchestrates cancel → wait → start.
   server relays it and the browser interpolates between polls. The server **does no timing at all**
   (memo §5.3).
 - **`next_poll_ms` is server-set**, one integer in a body the board already parses (memo §5.1, §6.3.5).
+
+- **`wedge` and `reset_cause` are board-side facts, relayed verbatim.** Neither is parsed, recomputed
+  or interpreted by the service. `wedge` is the board's own tally of poll failures and radio cycles
+  (firmware `lib/wedge.py`); `reset_cause` is `machine.reset_cause()` — **how the previous boot
+  ended** — read once per boot. `1` is a cold start (`PWRON_RESET`) and `3` is the watchdog latch
+  (`WDT_RESET`) that upstream work chased for days. The service sits on the far side of the radio the
+  board cannot shout over, so a field carried back on the next **successful** poll is the only way
+  either one is ever visible from off-board; without it, telling a cold start from a watchdog reset
+  needs a USB console, and a panel that is powered from a smart plug has no console port left.
 
 ### 3.1 Restart safety, both directions
 

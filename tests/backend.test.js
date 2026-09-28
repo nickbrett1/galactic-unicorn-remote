@@ -100,6 +100,9 @@ describe("/device/poll — auth and validation", () => {
       { rssi: "5" },
       { uptime_s: "-2" },
       { wedge: "x".repeat(65) },
+      { reset_cause: "-1" },
+      { reset_cause: "16" },
+      { reset_cause: "abc" },
     ];
     for (const override of cases) {
       const res = poll({ url: pollUrl(override) });
@@ -130,6 +133,21 @@ describe("/device/poll — auth and validation", () => {
     // Stored on the observed slot, unparsed: only the board can classify its
     // own failures, so the service relays the string and does not interpret it.
     expect(getObserved().wedge).toBe(tally);
+  });
+
+  it("relays the reset cause verbatim (firmware machine.reset_cause())", async () => {
+    // 3 is WDT_RESET on this port: the latch the wedge work was chasing, which
+    // used to be visible only on the USB console.
+    const res = poll({ url: pollUrl({ reset_cause: "3" }) });
+    expect(res.status).toBe(200);
+    expect(getObserved().reset_cause).toBe(3);
+  });
+
+  it("rejects a bool-ish or out-of-range reset_cause", async () => {
+    for (const raw of ["-1", "16", "yes", "3.5"]) {
+      const res = poll({ url: pollUrl({ reset_cause: raw }) });
+      expect(res.status, raw).toBe(422);
+    }
   });
 
   it("seeds gen = applied_gen + 1 on the first poll (R6) and returns a tiny body", async () => {
@@ -419,6 +437,7 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
         routine: "cleanup",
         remaining_s: "42",
         wedge: "heap0.link1.other0.cy1.rec1.pk1",
+        reset_cause: "3",
       }),
     });
     const res = getState({ locals: { door: TUNNEL } });
@@ -436,6 +455,8 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
     expect(body.panel.remaining_s).toBe(42);
     // the board's own wedge tally, relayed verbatim (firmware lib/wedge.py)
     expect(body.panel.wedge).toBe("heap0.link1.other0.cy1.rec1.pk1");
+    // how the previous boot ended, relayed verbatim (firmware machine.reset_cause())
+    expect(body.panel.reset_cause).toBe(3);
     expect(body.routines).toHaveLength(3);
     expect(body.routines.map((r) => r.id)).toEqual([
       "bathtime",

@@ -237,6 +237,21 @@ paths:
           in: query
           required: false
           schema: { type: integer, minimum: 0 }
+        - name: wedge
+          in: query
+          required: false
+          description: >
+            The board's own failure tally (firmware `lib/wedge.py`) — heap/link/other failures, radio
+            cycles attempted and recovered, peak run. Stored verbatim; the service never parses it.
+          schema: { type: string, maxLength: 64 }
+        - name: reset_cause
+          in: query
+          required: false
+          description: >
+            How the board's PREVIOUS boot ended (`machine.reset_cause()`, firmware `lib/remote.py`),
+            read once per boot: 1 PWRON_RESET, 2 HARD_RESET, 3 WDT_RESET, 4 SOFT_RESET,
+            5 DEEPSLEEP_RESET. Relayed verbatim; the service never interprets it.
+          schema: { type: integer, minimum: 0, maximum: 15 }
       responses:
         "200":
           description: Desired state and the poll cadence.

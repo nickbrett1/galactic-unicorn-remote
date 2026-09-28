@@ -75,6 +75,18 @@ export interface Observed {
   remaining_s?: number;
   rssi?: number;
   uptime_s?: number;
+  /**
+   * The board's own failure tally (firmware `lib/wedge.py`): heap/link/other
+   * counts, radio cycles attempted and recovered, peak run. Relayed verbatim —
+   * only the board can classify its own poll failures.
+   */
+  wedge?: string;
+  /**
+   * How the board's PREVIOUS boot ended, `machine.reset_cause()`, read once per
+   * boot: 1 PWRON_RESET cold start, 3 WDT_RESET the watchdog latch. Relayed
+   * verbatim; the service never interprets it.
+   */
+  reset_cause?: number;
 }
 
 /**
@@ -147,6 +159,8 @@ export interface DevicePollReport {
   remaining_s?: number;
   rssi?: number;
   uptime_s?: number;
+  wedge?: string;
+  reset_cause?: number;
 }
 
 /** What the server answers: desired state AND the cadence (memo §5.1, §6.3.5). */
