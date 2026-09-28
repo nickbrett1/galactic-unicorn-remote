@@ -1094,3 +1094,35 @@ times — but not a deployment path. Getting `reset_cause` live needs a USB depl
 included `lib/remote.py` and `lib/reconcile.py`, which means moving the cable back to the mac-studio
 and giving the plug's socket up. Until then `panel.reset_cause` stays absent, and the field's whole
 purpose — seeing a `WDT_RESET` without a console — is still prospective.
+
+### Closed: `panel.reset_cause` is on the wire
+
+The USB deploy landed (`lib/remote.py` 7998d618…, 33451 B; `lib/reconcile.py` 7ef62bec…, 13256 B,
+verified by board-side sha256) and the board's console banner confirmed the read:
+`wifi: === boot fw=0.1.40 reset_cause=3 free=99168 ===`. But `/api/state` still showed no
+`reset_cause`, because the NAS container was still the **pre-change** image — `parsePollReport` of
+that build simply ignores the unknown query parameter.
+
+The reason was not the board: the registry *had* the new image
+(`ghcr.io/nickbrett1/galactic-unicorn-remote@sha256:78b5f3cc…`, built 2026-09-28T11:19Z) while the
+running container was pinned to the previous one (`…@sha256:5a4e7c53…`, 2026-09-27T21:39Z, matching
+commit `718502d`). Watchtower had **not** recreated it, despite the
+`com.centurylinklabs.watchtower.enable=true` label and both `watchtower` and `watchtower-nick`
+up and healthy for two days. It was ~14 h stale. That is the second time the label has not produced
+a recreate, and it is worth not relying on: `docker compose up -d` in
+`/volumeUSB1/usbshare/docker/galactic-unicorn-remote` (NAS ssh is on port **2222**, not 22) pulled
+`78b5f3cc…` and recreated the container in one step.
+
+Result, end to end and stable across repeated polls:
+
+    panel.fw=0.1.40  panel.boot=bfa2bf22  panel.online=true  panel.reset_cause=3
+
+`reset_cause=3` is `WDT_RESET` — the latch says the **previous** boot ended in the watchdog. That
+boot followed the clean power cycle of the previous entry, i.e. an ordinary running boot, not a
+deliberate `machine.reset()`. So the render loop blocked past the 8 s watchdog on a normal uptime,
+and the new field surfaced it on its first outing: the exact thing it was built to make visible
+without a console is now visible without one.
+
+One loop still open: the board runs 0.1.40 with only the two USB-deployed files from 0.1.41, so the
+tree is a hybrid. A future full release still needs `boot.py` (excluded from the pack) to apply it,
+and that path did not work in the previous entry's test.
