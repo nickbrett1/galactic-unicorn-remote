@@ -61,6 +61,17 @@ export function buildStateSnapshot({
         ...(observed.reset_cause !== undefined
           ? { reset_cause: observed.reset_cause }
           : {}),
+        // The idle screen's weather (firmware lib/weather.py), relayed
+        // verbatim like wedge and reset_cause: the board reads Open-Meteo
+        // itself and reports the temp_c + condition pair it is drawing, so the
+        // remote page and the tile draw the same indicator the panel draws.
+        // The service never asks a weather API of its own — a second reading
+        // would be free to disagree with the panel's. Absent means "no
+        // reading", which is normal, not a failure.
+        ...(observed.condition !== undefined
+          ? { condition: observed.condition }
+          : {}),
+        ...(observed.temp_c !== undefined ? { temp_c: observed.temp_c } : {}),
       }
     : { boot: null, fw: null, applied_gen: 0, state: "ambient" };
 

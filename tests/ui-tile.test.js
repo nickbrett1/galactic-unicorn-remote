@@ -122,6 +122,30 @@ describe("the tile mirrors the remote, read-only", () => {
     expect(container.querySelectorAll(".chip")).toHaveLength(ROUTINES.length);
   });
 
+  it("shows the panel's weather on the idle screen, from the shared indicator", () => {
+    const { container } = renderTile({ condition: "partly", temp_c: 18 });
+    const chip = container.querySelector(".weather");
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute("data-condition")).toBe("partly");
+    expect(chip.getAttribute("aria-label")).toBe("Partly cloudy, 18C");
+  });
+
+  it("renders no weather when the board has no reading", () => {
+    const { container } = renderTile();
+    expect(container.querySelector(".weather")).toBeNull();
+  });
+
+  it("draws weather only on the idle screen, as the panel does", () => {
+    const { container } = renderTile({
+      state: "countdown",
+      routine: "bathtime",
+      remaining_s: 200,
+      condition: "rain",
+      temp_c: 5,
+    });
+    expect(container.querySelector(".weather")).toBeNull();
+  });
+
   it("follows the SSE stream", async () => {
     renderTile();
     await act(() => {

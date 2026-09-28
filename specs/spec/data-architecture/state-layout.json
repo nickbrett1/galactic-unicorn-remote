@@ -22,8 +22,7 @@
     },
     "observed": {
       "type": "object",
-      "shape": "{ boot, fw, applied_gen, state, routine?, remaining_s?, rssi?, uptime_s?, received_at }",
-      "writer": "/device/poll only",
+      "shape": "{ boot, fw, applied_gen, state, routine?, remaining_s?, rssi?, uptime_s?, wedge?, reset_cause?, condition?, temp_c?, received_at }",      "writer": "/device/poll only",
       "readers": ["/api/state (display)", "/api/events (display)", "audit log"],
       "invariant": "exactly one writer (the board) per direction; the server never writes this slot (memo §2)",
       "derived": {

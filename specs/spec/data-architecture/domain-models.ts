@@ -29,6 +29,13 @@ export type PanelState = 'ambient' | 'prompt' | 'countdown' | 'handoff';
 /** The action carried in the desired-state slot. `none` is a valid, idempotent no-op. */
 export type DesiredAction = 'start' | 'cancel' | 'none';
 
+/**
+ * The seven sky conditions the board's `lib/weather.py` classifies a WMO code
+ * into, and the seven glyphs the panel can draw (firmware `lib/icons.py`).
+ * Relayed verbatim; the service never re-derives them.
+ */
+export type WeatherCondition = 'sun' | 'partly' | 'cloud' | 'fog' | 'rain' | 'snow' | 'thunder';
+
 /** Which door a request arrived through — for display and audit, never authorisation (memo §8.3). */
 export type DoorKind = 'tunnel' | 'tailnet' | 'lan';
 
@@ -87,6 +94,15 @@ export interface Observed {
    * verbatim; the service never interprets it.
    */
   reset_cause?: number;
+  /**
+   * The idle screen's weather, relayed verbatim (firmware `lib/weather.py`).
+   * The board classifies a WMO code into one of these seven; both fields travel
+   * as a PAIR or not at all, and absent means "no reading yet" — normal, not a
+   * failure.
+   */
+  condition?: WeatherCondition;
+  /** Whole degrees Celsius, relayed verbatim. Paired with `condition`. */
+  temp_c?: number;
 }
 
 /**
@@ -161,6 +177,8 @@ export interface DevicePollReport {
   uptime_s?: number;
   wedge?: string;
   reset_cause?: number;
+  condition?: WeatherCondition;
+  temp_c?: number;
 }
 
 /** What the server answers: desired state AND the cadence (memo §5.1, §6.3.5). */

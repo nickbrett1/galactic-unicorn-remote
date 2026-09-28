@@ -177,6 +177,20 @@ describe("D1 — the shell and exactly four controls", () => {
     expect(screen.getByRole("img")).toHaveAccessibleName(/idle/i);
   });
 
+  it("shows the same weather indicator the tile and the panel show", () => {
+    const { container } = renderPage({
+      panel: { condition: "snow", temp_c: -3 },
+    });
+    const chip = container.querySelector(".weather");
+    expect(chip).toBeTruthy();
+    expect(chip.getAttribute("aria-label")).toBe("Snow, -3C");
+  });
+
+  it("renders no weather when the board has no reading", () => {
+    const { container } = renderPage();
+    expect(container.querySelector(".weather")).toBeNull();
+  });
+
   it("shouts the routine in HANDOFF", () => {
     const { container } = renderPage({
       panel: { state: "handoff", routine: "bathtime", applied_gen: 3 },

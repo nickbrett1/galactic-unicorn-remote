@@ -252,6 +252,27 @@ paths:
             read once per boot: 1 PWRON_RESET, 2 HARD_RESET, 3 WDT_RESET, 4 SOFT_RESET,
             5 DEEPSLEEP_RESET. Relayed verbatim; the service never interprets it.
           schema: { type: integer, minimum: 0, maximum: 15 }
+        - name: temp_c
+          in: query
+          required: false
+          description: >
+            The board's current temperature in whole degrees Celsius for the idle screen, relayed
+            verbatim (firmware `lib/weather.py`, `format_temp`). Negative is normal. Sent only as a
+            PAIR with `condition`; a lone half is rejected with a `422` naming the missing field.
+            Absent means "the board has no reading yet", which is normal, not a failure. The service
+            never calls a weather API itself — a page and a panel each fetching their own would be
+            free to disagree about a sky that is only happening once.
+          schema: { type: integer, minimum: -100, maximum: 100 }
+        - name: condition
+          in: query
+          required: false
+          description: >
+            The board's classified sky condition for the idle screen, one of the seven glyphs it can
+            draw (firmware `lib/weather.py`, `classify`). Relayed verbatim; sent only as a PAIR with
+            `temp_c`.
+          schema:
+            type: string
+            enum: [sun, partly, cloud, fog, rain, snow, thunder]
       responses:
         "200":
           description: Desired state and the poll cadence.
@@ -434,6 +455,17 @@ components:
         remaining_s: { type: integer, minimum: 0 }
         rssi: { type: integer }
         uptime_s: { type: integer, minimum: 0 }
+        condition:
+          type: string
+          enum: [sun, partly, cloud, fog, rain, snow, thunder]
+          description: >
+            The board's classified sky condition, relayed verbatim (firmware `lib/weather.py`).
+            Present only when the board has a reading, and only ever as a pair with `temp_c`.
+        temp_c:
+          type: integer
+          description: >
+            The board's temperature in whole degrees Celsius, relayed verbatim. Present only when the
+            board has a reading, and only ever as a pair with `condition`.
     PanelLiveness:
       type: object
       description: >
