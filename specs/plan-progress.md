@@ -1126,3 +1126,79 @@ without a console is now visible without one.
 One loop still open: the board runs 0.1.40 with only the two USB-deployed files from 0.1.41, so the
 tree is a hybrid. A future full release still needs `boot.py` (excluded from the pack) to apply it,
 and that path did not work in the previous entry's test.
+
+## In-loop OTA of a full release was never a heap problem (2026-09-28, session 8)
+
+The carried item read "in-loop OTA of a *full* release OOMs (`MemoryError`) while a one-file pack
+applies". That is not what the board says. `cat :update.log` on the board shows the same failure
+repeated for the 0.1.41 release, and it is not the heap at all:
+
+    File "/lib/updater.py", line 731, in _update
+    File "/lib/updater.py", line 420, in _unpack
+    OSError: 28
+
+`OSError(28)` is ENOSPC, in the write of `:next/`. The `MemoryError` was a real failure too but it
+belongs to the *manifest* fetch (already mitigated by the `gc.collect()` in `_run_update_check`), and
+it had been carried forward as if it explained the pack.
+
+The arithmetic is the whole story, and it was measurable from the outside. The pack is 191289 B (47
+blocks of 4096) and the files it carries total 190934 B (47 blocks). The old shape downloaded the
+pack to `:incoming.pack` and unpacked it afterwards, so live + pack + `:next` were resident at once:
+94 of the board's 98 free blocks, leaving four. Four is not headroom littlefs can commit metadata
+in, which is exactly why the failure landed *inside* `_unpack` and not at the end. A one-file pack
+applied fine because 47 blocks of that peak went away with it - and that is the way out, because the
+pack was always the one part that is re-downloadable.
+
+**The fix** (`galactic-unicorn` 01107f6, plus 28d3438 for a lint gate): `_download` + `_unpack`
+become `_stage` + `_PackSink`, a small state machine over the length-prefixed records, and the body
+is written straight into `:next/` as it arrives. The pack never lands on flash. The usual argument
+for the two-step - verify the pack before unpacking it - does not survive the ordering that actually
+matters: nothing touches a live file either way and `:next` is discarded on any failure, so a bad
+pack costs a wasted download whether the sha is checked first or last. Kept: the per-file sha
+against the manifest, the manifest's file LIST against what the pack actually carried, the read cap,
+the fuse feed throughout, and the "a non-200 is reported as an HTTP status, not as a pack error"
+rule, now via a drain wrapper so an error page cannot put "truncated pack" in the log when the
+server said 500.
+
+Measured on the host before shipping it, exact high-water mark by snapshotting the tree after every
+mutating syscall, both versions driven end to end against the real 0.1.41 on the LAN mirror:
+
+    old  applied 0.1.41   live=233662  peak=+373586
+    new  applied 0.1.41   live=233662  peak=+193089
+
+191 KB less resident at the peak - the whole pack. On the board that is 94 of 98 free blocks
+becoming 47 of 98. Tests: the two `_download` cases become four `_stage` cases (streams and verifies
+every file; refuses a wrong pack sha, a truncated body, and a pack missing a file the manifest
+promised - the last is the only one the LIST check can catch, and the suite had no coverage for it).
+12/12, and every other firmware suite still green.
+
+### Confirmed on the board: the board took a full OTA release by itself
+
+`lib/updater.py` was USB-deployed (board sha `95edbd3e…`, 42721 B - it is pack-EXCLUDED by design, so
+this is the only way it ever moves), the board rebooted, and its own check landed the release. First
+time a full 17-file release has reached this board over the air.
+
+    update.log   applied 0.1.41 (191289 bytes, 17 files)
+                 no update: 0.1.41 is already running
+    version.txt  0.1.41        boot-ok.txt  0.1.41
+    :prev :next :incoming.pack   all absent; crash.log absent
+    free blocks  103 of 192
+
+And the tree is the release, not something that merely claims a version: every one of the 17 files on
+the board hashes to the manifest's sha256 (`main.py` 951ab681…, `lib/net.py`, `lib/wedge.py` and the
+14 others - 17/17). The rollback slot was dropped after the boot, as `_recover` is meant to.
+
+### The reset-loop was the console, not a new fault
+
+During the deploy the board looked like it was reset-looping: every boot reported
+`reset_cause=3`, and the USB CDC re-enumerated under a new node. It is an artefact of the debugging
+itself, and it is worth writing down so it is not chased again. Attaching to the board means Ctrl-C,
+which kills the render loop; the loop is what feeds the fuse, so 8 s later the watchdog cuts the
+board down - and `machine.reset_cause()` on the *next* boot dutifully reports 3. One console session
+therefore plants one WDT latch on the following boot, which is also why an earlier session read
+`reset_cause=3` after a clean power cycle and concluded the render loop had blocked: that reading was
+most likely this same planted latch. The wedge tally in that window shows the radio doing its job
+(`other3.cy1.rec1` - three link timeouts, one cycle attempted, one recovered), not a second fault.
+
+`lib/updater.py` still needs one more USB deploy so the board's copy matches HEAD (`28d3438` adds
+only a `# noqa: SIM115` and its reason); behaviour is identical.
