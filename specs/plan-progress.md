@@ -1078,3 +1078,19 @@ artefact of the USB console — every wedge seen in the debugging sessions follo
 interrupt, and the console is now gone, so the suspected trigger is no longer present. (2) The
 in-loop OTA of a *full* release still OOMs (previous entry); a firmware change therefore lands via
 `boot.py`'s check on a reboot, which is also the path 0.1.40 took.
+
+### Addendum: the plug gives reboots, not deployments
+
+0.1.41 was released (pack 191289 B, 17 files) and the mirror serves it, but the board stayed on
+0.1.40 through **both** routes. It was power-cycled from the plug and came back clean (boot
+`57b3060c` -> `fccc36d1`, wedge zeroed) still on 0.1.40 — so `boot.py`'s check did **not** apply a
+full release either, which is not what the earlier entry assumed. Then, with the release waiting and
+the mirror up, uptime ran past `UPDATE_RETRY_MS` (15 min) with no reset and no apply: the in-loop
+`check_for_update` did not land it, which is the known full-release OOM rather than a missing fetch
+(same host:port as the poll, so the manifest is reachable).
+
+So the plug is a reliable **reboot** button — twice out of twice, relay `on_time` resetting both
+times — but not a deployment path. Getting `reset_cause` live needs a USB deploy of the pack-
+included `lib/remote.py` and `lib/reconcile.py`, which means moving the cable back to the mac-studio
+and giving the plug's socket up. Until then `panel.reset_cause` stays absent, and the field's whole
+purpose — seeing a `WDT_RESET` without a console — is still prospective.
