@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
                     CHECK (door IN ('tunnel','tailnet','lan','device','server')),
 
     -- WHAT was attempted. 'start' | 'cancel' | 'replace' | 'none' for commands;
-    -- device rows use 'poll' / 'boot' / 'applied' events.
+    -- 'message' for an idle banner (idle-screen content, not a device event —
+    -- device-protocols.md §3.0); device rows use 'poll' / 'boot' / 'applied'.
     action          TEXT    NOT NULL,
 
     -- The routine, when the action carries one.

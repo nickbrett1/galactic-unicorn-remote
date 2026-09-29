@@ -103,6 +103,13 @@ export interface Observed {
   condition?: WeatherCondition;
   /** Whole degrees Celsius, relayed verbatim. Paired with `condition`. */
   temp_c?: number;
+  /**
+   * The id of the idle banner the board is currently DRAWING, or absent when it
+   * is drawing none. The board's echo of `Message.id`; this is how a message's
+   * "sent vs done" (memo §9.1) is confirmed. It is idle-screen content, not a
+   * fifth device event (device-protocols.md §3.0).
+   */
+  message_id?: number;
 }
 
 /**
@@ -124,6 +131,8 @@ export interface StateSnapshot {
   /** Observed ∪ Liveness. */
   panel: Observed & PanelLiveness;
   desired: Desired;
+  /** The live idle banner, or null when there is none (§10). */
+  message?: Message | null;
   routines: Routine[];
   door?: { kind: DoorKind; email: string | null };
 }
@@ -155,6 +164,44 @@ export interface PanelOffline {
   last_seen_s: number;
 }
 
+/**
+ * An idle banner: a short line of text that scrolls across the panel's IDLE
+ * screen. It is idle-screen CONTENT, not a fifth device event (memo §3;
+ * device-protocols.md §3.0): it has its own monotonic `id`, moves no `gen`, and
+ * is dropped the moment the panel leaves `ambient` or its TTL elapses.
+ */
+export interface Message {
+  /** Monotonic, independent of `gen`. The board echoes it back as `message_id`. */
+  id: number;
+  /** Printable ASCII only, 1..MESSAGE_MAX_LEN chars, at least one non-blank. Never echoed back. */
+  text: string;
+  /** Server epoch seconds. The board never compares this; expiry is server-side (memo §5.4). */
+  expires_at: number;
+}
+
+/** The body of `POST /api/message`. Refused unless the panel is idle (§10). */
+export interface MessageRequest {
+  text: string;
+}
+
+/**
+ * A message was ACCEPTED, not done. Confirmed only when the board reports the
+ * same `message_id` it was sent — the sent-vs-done rule (memo §9.1), with the
+ * acknowledgement swapped from `applied_gen` to `message_id`.
+ */
+export interface MessageAck {
+  id: number;
+  expires_at: number;
+  ttl_s: number;
+}
+
+/** Returned when a message arrives while the panel is not idle: nothing was set. */
+export interface PanelBusy {
+  error: 'panel_busy';
+  state: PanelState;
+  current_routine?: RoutineId;
+}
+
 export interface ApiError {
   error: string;
   detail?: string;
@@ -179,6 +226,8 @@ export interface DevicePollReport {
   reset_cause?: number;
   condition?: WeatherCondition;
   temp_c?: number;
+  /** The id of the banner the board is currently drawing, if any (§3.0). */
+  message_id?: number;
 }
 
 /** What the server answers: desired state AND the cadence (memo §5.1, §6.3.5). */
@@ -186,6 +235,8 @@ export interface DevicePollResponse {
   gen: number;
   action: DesiredAction;
   routine?: RoutineId;
+  /** The live idle banner to draw, or absent when there is none (§3.0). */
+  message?: Message;
   /** ~5000 idle, ~2000 on demand. Server-generated and clamped. */
   next_poll_ms: number;
 }
@@ -255,4 +306,15 @@ export type NextPollMs = (input: {
   pendingApply: boolean;
   activeCountdown: boolean;
   subscribers: number;
+  /** A live idle banner is up: fetch/expire it promptly rather than waiting out the idle interval (§3.0). */
+  messageActive: boolean;
 }) => number;
+
+/** Idle-only gate: a banner may only be composed when the panel is online AND idle (device-protocols.md §3.0). */
+export type CanShowMessage = (panel: Observed & PanelLiveness) => boolean;
+
+/** A banner is live while now < expires_at; enforced server-side only (memo §5.4). */
+export type IsMessageLive = (message: Message | null, nowEpochS: number) => boolean;
+
+/** Printable ASCII (0x20–0x7e), 1..maxLen chars, at least one non-blank — the panel's font bound. */
+export type IsValidMessageText = (text: unknown, maxLen?: number) => boolean;

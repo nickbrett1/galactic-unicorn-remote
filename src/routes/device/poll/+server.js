@@ -17,16 +17,19 @@ import { jsonResponse } from "../../../lib/server/http.js";
 import {
   isExpired,
   isGenApplied,
+  isMessageLive,
   nextPollMs,
   PANEL_STATES,
 } from "../../../lib/server/reconcile.js";
 import { isRoutineId } from "../../../lib/server/routines.js";
 import {
   clearDesired,
+  clearMessage,
   clearReplaceSequence,
   getDesired,
   getGen,
   getLiveness,
+  getMessage,
   getObserved,
   getReplaceSequence,
   getSubscriberCount,
@@ -198,6 +201,13 @@ function parsePollReport(params) {
   );
   if (causeBad !== null) return { ok: false, detail: causeBad };
 
+  // The id of the idle banner the board is currently scrolling (firmware's
+  // message marquee), relayed verbatim like wedge and reset_cause. Absent means
+  // "not showing a message". This is how the phone learns the message landed —
+  // the board echoing back the id it was told to draw (`device-protocols.md` §3).
+  const messageIdBad = readOptionalInt(params, "message_id", report, 0, null);
+  if (messageIdBad !== null) return { ok: false, detail: messageIdBad };
+
   // The idle screen's weather (firmware lib/weather.py), relayed verbatim like
   // wedge and reset_cause: the board polls Open-Meteo itself and reports the
   // reading it is drawing, so the page and the panel cannot disagree. The
@@ -232,6 +242,30 @@ function auditDevice({
     panel_state_reported: observed?.state ?? null,
     detail,
   });
+}
+
+/**
+ * Drop the idle banner the moment it is no longer showable: it expired, or the
+ * board is no longer on the idle screen. Idle-screen content must not survive a
+ * countdown and reappear later (`device-protocols.md` §3).
+ *
+ * @param {{report: object, nowS: number}} input
+ */
+function dropDeadBanner({ report, nowS }) {
+  const banner = getMessage();
+  if (!banner) return;
+  const expired = !isMessageLive(banner, nowS);
+  const leftIdle = report.state !== "ambient";
+  if (!expired && !leftIdle) return;
+  auditDevice({
+    action: "message",
+    outcome: "expired",
+    nowS,
+    detail: leftIdle
+      ? "dropped: panel left the idle screen"
+      : "dropped: message TTL elapsed",
+  });
+  clearMessage();
 }
 
 /** @param {URLSearchParams} params @returns {Response} */
@@ -287,8 +321,18 @@ export function GET({ url }) {
         detail: "replace abandoned: panel rebooted mid-sequence",
       });
     }
+    const liveMessage = getMessage();
+    if (liveMessage) {
+      auditDevice({
+        action: "message",
+        outcome: "expired",
+        nowS,
+        detail: "discarded: panel rebooted before the message landed",
+      });
+    }
     clearDesired();
     clearReplaceSequence();
+    clearMessage();
     auditDevice({
       action: "boot",
       outcome: "noop",
@@ -374,21 +418,27 @@ export function GET({ url }) {
     }
   }
 
+  // (6) The idle banner is only ever live on the idle screen. It is idle-screen
+  // CONTENT, not a fifth device event, so it moves no `gen` (`device-protocols.md` §3).
+  dropDeadBanner({ report, nowS });
+
   const pending = getDesired();
   const pendingApply = Boolean(pending && pending.action !== "none");
   const activeCountdown =
     report.state === "countdown" || report.state === "handoff";
+  const messageActive = Boolean(getMessage());
 
-  // (6) Demand-driven cadence.
+  // (7) Demand-driven cadence.
   const nextMs = nextPollMs({
     pendingApply,
     activeCountdown,
     subscribers: getSubscriberCount(),
+    messageActive,
     minMs: config.nextPollMinMs,
     maxMs: config.nextPollMaxMs,
   });
 
-  // (7) The tiny response. Never echoes input.
+  // (8) The tiny response. Never echoes input.
   const body = {
     gen: getGen(),
     action: pending && pending.action !== "none" ? pending.action : "none",
@@ -396,6 +446,12 @@ export function GET({ url }) {
   };
   if (pending && pending.action !== "none" && pending.routine) {
     body.routine = pending.routine;
+  }
+  // Present only while a banner is live; the board scrolls it on the idle
+  // screen and echoes the id back as `message_id` to confirm it is drawing.
+  const liveBanner = getMessage();
+  if (liveBanner) {
+    body.message = { id: liveBanner.id, text: liveBanner.text };
   }
 
   return jsonResponse(body, 200);

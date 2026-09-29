@@ -13,14 +13,18 @@ import { formatLastSeen } from "./format.js";
 
 /** @typedef {{kind: 'idle'}} Idle */
 /** @typedef {{kind: 'pressing', action: string, routine: string|null}} Pressing */
-/** @typedef {{kind: 'sending', gen: number, action: string, routine: string|null, expiresAt: number}} Sending */
+/** @typedef {{kind: 'sending', action: string, routine: string|null, expiresAt: number, gen?: number, messageId?: number}} Sending */
 /** @typedef {{kind: 'confirmed', action: string, routine: string|null}} Confirmed */
 /** @typedef {{kind: 'expired', action: string, routine: string|null, lastSeenS: number|null}} Expired */
 /** @typedef {{kind: 'conflict', currentRoutine: string|null, requested: string|null}} Conflict */
+/** @typedef {{kind: 'not_idle', state: string|null}} NotIdle */
 /** @typedef {{kind: 'noop', action: string, reason: string}} Noop */
 /** @typedef {{kind: 'offline', lastSeenS: number|null}} Offline */
 /** @typedef {{kind: 'error'}} ErrorState */
-/** @typedef {Idle|Pressing|Sending|Confirmed|Expired|Conflict|Noop|Offline|ErrorState} CommandStatus */
+/** @typedef {Idle|Pressing|Sending|Confirmed|Expired|Conflict|NotIdle|Noop|Offline|ErrorState} CommandStatus */
+
+/** The banner action carries no `gen`; its confirmation is a reported message id. */
+const MESSAGE_ACTION = "message";
 
 /** @returns {Idle} */
 export function initialStatus() {
@@ -60,16 +64,31 @@ export function reduceStatus(status, event) {
 
 /** @param {{httpStatus: number, body: any, action: string, routine: string|null}} event */
 function onResponse({ httpStatus, body, action, routine }) {
+  if (httpStatus === 202 && body && action === MESSAGE_ACTION) {
+    if (typeof body.id !== "number") return { kind: "error" };
+    return {
+      kind: "sending",
+      action,
+      routine: null,
+      messageId: body.id,
+      expiresAt: body.expires_at ?? 0,
+    };
+  }
   if (httpStatus === 202 && body && typeof body.gen === "number") {
     return {
       kind: "sending",
-      gen: body.gen,
       action,
       routine: routine ?? body.routine ?? null,
+      gen: body.gen,
       expiresAt: body.expires_at ?? 0,
     };
   }
   if (httpStatus === 409) {
+    // A banner is refused while the panel is busy — a different outcome from the
+    // routine conflict, and worded as such.
+    if (action === MESSAGE_ACTION) {
+      return { kind: "not_idle", state: body?.state ?? null };
+    }
     return {
       kind: "conflict",
       currentRoutine: body?.current_routine ?? null,
@@ -98,10 +117,15 @@ function onSnapshot(status, snapshot, nowMs) {
   const panel = snapshot?.panel ?? {};
 
   if (status.kind === "sending") {
-    if (
-      typeof panel.applied_gen === "number" &&
-      panel.applied_gen >= status.gen
-    ) {
+    // A banner confirms when the board reports it is drawing THAT id — the
+    // message analogue of `applied_gen >= gen` (memo §9.1).
+    const landed =
+      status.action === MESSAGE_ACTION
+        ? typeof panel.message_id === "number" &&
+          panel.message_id === status.messageId
+        : typeof panel.applied_gen === "number" &&
+          panel.applied_gen >= status.gen;
+    if (landed) {
       return {
         kind: "confirmed",
         action: status.action,
@@ -142,9 +166,13 @@ export function statusText(status) {
     case "sending":
       return "sending…";
     case "confirmed":
-      return "confirmed";
+      return status.action === MESSAGE_ACTION
+        ? "showing on the panel"
+        : "confirmed";
     case "expired":
       return `the panel didn't answer (last seen ${formatLastSeen(status.lastSeenS)})`;
+    case "not_idle":
+      return "the panel isn't idle — messages only show when it is";
     case "offline":
       return `panel offline (last seen ${formatLastSeen(status.lastSeenS)})`;
     case "noop":
@@ -164,6 +192,7 @@ export function statusTone(status) {
     case "sending":
     case "expired":
     case "conflict":
+    case "not_idle":
     case "noop":
       return "warn";
     case "confirmed":

@@ -30,6 +30,11 @@
   let status = $state(initialStatus());
   let replaceBtn = $state(null);
 
+  // The idle banner composer. A message only ever shows on the idle screen, so
+  // the composer is offered only while the panel is idle and reachable.
+  let messageText = $state("");
+  const messageMaxLen = $derived(data.messageMaxLen ?? 60);
+
   let lastSeenS = $derived(
     snapshot?.panel?.last_seen_s == null
       ? null
@@ -54,6 +59,12 @@
 
   let busy = $derived(isBusy(status));
   let disabled = $derived(!online || busy);
+  // Idle = the panel's own reported state, the one screen the message draws on.
+  let idle = $derived(snapshot?.panel?.state === "ambient");
+  let showComposer = $derived(online && idle);
+  // A banner the server is holding live — shown for the benefit of a second
+  // phone (the sender confirms through the command status instead).
+  let liveBanner = $derived(idle ? (snapshot?.message?.text ?? null) : null);
   let statusWord = $derived(statusText(status));
   let tone = $derived(statusTone(status));
   let conflictCurrentLabel = $derived(
@@ -115,11 +126,50 @@
     }
   }
 
+  async function sendMessage() {
+    const text = messageText.trim();
+    if (!text) return;
+    // Optimistic PRESS, never optimistic success — same rule as a routine.
+    dispatch({ type: "press", action: "message", routine: null });
+    try {
+      const response = await fetch("/api/message", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      let parsed = null;
+      try {
+        parsed = await response.json();
+      } catch {
+        parsed = null;
+      }
+      if (response.status === 202) messageText = "";
+      dispatch({
+        type: "response",
+        httpStatus: response.status,
+        body: parsed,
+        action: "message",
+        routine: null,
+        nowMs: Date.now(),
+      });
+    } catch {
+      dispatch({
+        type: "response",
+        httpStatus: 0,
+        body: null,
+        action: "message",
+        routine: null,
+        nowMs: Date.now(),
+      });
+    }
+  }
+
   // A confirmation (or a small notice) flashes, then clears itself.
   $effect(() => {
     if (
       status.kind === "confirmed" ||
       status.kind === "noop" ||
+      status.kind === "not_idle" ||
       status.kind === "error"
     ) {
       const timer = setTimeout(() => dispatch({ type: "reset" }), 2400);
@@ -270,6 +320,9 @@
       <p class="countdown">{countdownText}</p>
     {/if}
     <p class="stateword">{stateWordText}</p>
+    {#if liveBanner}
+      <p class="banner">scrolling: “{liveBanner}”</p>
+    {/if}
   </section>
 
   {#if !online}
@@ -325,6 +378,37 @@
   >
     Cancel
   </button>
+
+  {#if showComposer}
+    <!-- The message composer. It draws on the panel's idle screen, so it is
+         offered only while the panel is idle: a scroll over a running countdown
+         would mean nothing (design-system.md §10). -->
+    <form
+      class="message"
+      aria-label="Scroll a message across the panel"
+      onsubmit={(event) => {
+        event.preventDefault();
+        sendMessage();
+      }}
+    >
+      <label class="sr-only" for="panel-message">Message for the panel</label>
+      <input
+        id="panel-message"
+        type="text"
+        maxlength={messageMaxLen}
+        placeholder="Message for the panel"
+        bind:value={messageText}
+      />
+      <button
+        type="submit"
+        class="send"
+        disabled={busy || messageText.trim().length === 0}
+        class:in-flight={busy && status.action === "message"}
+      >
+        Send
+      </button>
+    </form>
+  {/if}
 
   {#if statusWord}
     <p class="status" role="status" data-tone={tone}>{statusWord}</p>
@@ -528,6 +612,57 @@
   }
   .status[data-tone="danger"] {
     color: var(--c-danger);
+  }
+
+  .banner {
+    margin: 0;
+    color: var(--c-muted);
+    font-size: 0.9rem;
+  }
+
+  .message {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-1);
+  }
+  .message input {
+    font: inherit;
+    color: var(--c-text);
+    background: var(--c-surface);
+    border: 1px solid var(--c-muted);
+    border-radius: var(--radius);
+    padding: 0 var(--space-2);
+    min-height: var(--tap-min);
+    min-width: 0;
+  }
+  .message input::placeholder {
+    color: var(--c-muted);
+  }
+  .message input:focus-visible {
+    outline: 3px solid var(--c-text);
+    outline-offset: 2px;
+  }
+  .message .send {
+    width: auto;
+    padding: 0 var(--space-2);
+    background: var(--c-go);
+    color: var(--c-on);
+    font-weight: 700;
+  }
+  .message .send.in-flight {
+    background: var(--c-go-dim);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .conflict {

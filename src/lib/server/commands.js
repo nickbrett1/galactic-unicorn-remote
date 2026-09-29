@@ -12,7 +12,11 @@
 import { appendAudit } from "./audit.js";
 import { config } from "./config.js";
 import { jsonResponse } from "./http.js";
-import { resolveCommand } from "./reconcile.js";
+import {
+  canShowMessage,
+  isValidMessageText,
+  resolveCommand,
+} from "./reconcile.js";
 import { isRoutineId } from "./routines.js";
 import {
   beginReplaceSequence,
@@ -21,6 +25,7 @@ import {
   getObserved,
   nowEpochS,
   setDesired,
+  setMessage,
 } from "./state.js";
 
 /** The panel as the conflict table sees it: last observed report ∪ derived liveness. */
@@ -306,6 +311,97 @@ export async function runReplace(request, door) {
     nowS,
   });
   return jsonResponse(desiredAck(desired, parsed.routine), 202);
+}
+
+/**
+ * Validate a banner body: `{text}` only, `additionalProperties: false`, and a
+ * printable-ASCII string inside the length bound. Returns an error CODE, never
+ * an echo of the offending value (memo §10).
+ *
+ * @returns {Promise<{ok: true, text: string} | {ok: false, error: string}>}
+ */
+async function readMessageBody(request, maxLen) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return { ok: false, error: "invalid_body" };
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    return { ok: false, error: "invalid_body" };
+  if (Object.keys(body).some((key) => key !== "text"))
+    return { ok: false, error: "invalid_body" };
+  if (!isValidMessageText(body.text, maxLen))
+    return { ok: false, error: "invalid_message" };
+  return { ok: true, text: body.text };
+}
+
+/**
+ * `POST /api/message {text}` — scroll a short message across the panel's idle
+ * screen. **Idle-only**: a message is refused unless the panel is reachable AND
+ * reporting `ambient`, because the board draws it on the one screen it has for
+ * content, and a scroll has no meaning over a running countdown.
+ *
+ * Not a fifth device event and not a `gen` command: the banner is relayed on
+ * every poll like the weather, and the board confirms it by reporting the `id`
+ * it is drawing (`device-protocols.md` §3).
+ *
+ * @param {Request} request
+ * @param {{kind: string, email: string|null}} [door]
+ */
+export async function runMessage(request, door) {
+  const parsed = await readMessageBody(request, config.messageMaxLen);
+  if (!parsed.ok) return jsonResponse({ error: parsed.error }, 422);
+
+  const nowS = nowEpochS();
+  const panel = panelView(nowS);
+
+  if (panel.online === false) {
+    auditRow({
+      action: "message",
+      outcome: "refused_offline",
+      door,
+      nowS,
+      detail: "panel offline; nothing set",
+    });
+    return jsonResponse(
+      { error: "panel_offline", last_seen_s: panel.last_seen_s ?? null },
+      503,
+    );
+  }
+
+  // Idle-only. The board's own screen is the reason, and the server enforces it
+  // here so the phone is told plainly rather than left waiting out a TTL.
+  if (!canShowMessage(panel)) {
+    auditRow({
+      action: "message",
+      outcome: "conflict",
+      door,
+      nowS,
+      detail: `panel is not idle (state=${panel.state ?? "unknown"})`,
+    });
+    return jsonResponse(
+      { error: "panel_busy", state: panel.state ?? null },
+      409,
+    );
+  }
+
+  const message = setMessage({ text: parsed.text, nowS });
+  auditRow({
+    action: "message",
+    outcome: "accepted",
+    door,
+    nowS,
+    detail: `id=${message.id} text=${parsed.text}`,
+  });
+  return jsonResponse(
+    {
+      id: message.id,
+      expires_at: message.expires_at,
+      ttl_s: config.messageTtlS,
+    },
+    202,
+  );
 }
 
 /** Re-exported for route modules that only need the current gen. */

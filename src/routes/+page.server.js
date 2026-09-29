@@ -5,6 +5,7 @@
  * never authorises anything.
  */
 
+import { config } from "../lib/server/config.js";
 import { buildStateSnapshot, LAN_DOOR } from "../lib/server/snapshot.js";
 
 /** @type {import('./$types').PageServerLoad} */
@@ -13,5 +14,8 @@ export function load({ locals }) {
   return {
     snapshot: buildStateSnapshot({ door }),
     door: { kind: door.kind, email: door.email ?? null },
+    // The banner's length bound, so the composer's `maxlength` matches the
+    // server's rule without the browser importing a server module.
+    messageMaxLen: config.messageMaxLen,
   };
 }

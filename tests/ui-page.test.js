@@ -65,17 +65,23 @@ function makeSnapshot(panel = {}) {
       ...panel,
     },
     desired: { gen: 0, action: "none", expires_at: 0 },
+    message: null,
     routines: ROUTINES,
     door: { kind: "tunnel", email: "ts.akhtar@gmail.com" },
   };
 }
 
-function renderPage({ panel = {}, email = "ts.akhtar@gmail.com" } = {}) {
+function renderPage({
+  panel = {},
+  email = "ts.akhtar@gmail.com",
+  messageMaxLen = 60,
+} = {}) {
   return render(Page, {
     props: {
       data: {
         snapshot: makeSnapshot(panel),
         door: { kind: "tunnel", email },
+        messageMaxLen,
       },
     },
   });
@@ -141,11 +147,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("D1 — the shell and exactly four controls", () => {
+describe("D1 — the shell and its controls", () => {
   it("renders three routine buttons and one Cancel, labelled from routines.json", () => {
     renderPage();
-    const buttons = screen.getAllByRole("button");
-    expect(buttons).toHaveLength(4);
     for (const routine of ROUTINES) {
       expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
     }
@@ -196,6 +200,95 @@ describe("D1 — the shell and exactly four controls", () => {
       panel: { state: "handoff", routine: "bathtime", applied_gen: 3 },
     });
     expect(container.textContent).toContain("BATHTIME!");
+  });
+});
+
+describe("D6 — the idle-only message composer", () => {
+  it("offers the composer only while the panel is idle", () => {
+    const { container } = renderPage();
+    expect(container.querySelector(".message")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+
+    cleanup();
+    const counting = renderPage({
+      panel: { state: "countdown", routine: "bathtime", remaining_s: 100 },
+    });
+    // A scroll has no meaning over a running countdown: no composer, no field.
+    expect(counting.container.querySelector(".message")).toBeNull();
+    expect(counting.container.querySelector("#panel-message")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  });
+
+  it("hides the composer while the panel is offline", () => {
+    const { container } = renderPage({
+      panel: { online: false, last_seen_s: 300 },
+    });
+    expect(container.querySelector(".message")).toBeNull();
+  });
+
+  it("bounds the field by the server's length rule", () => {
+    const { container } = renderPage({ messageMaxLen: 42 });
+    expect(container.querySelector("#panel-message").maxLength).toBe(42);
+  });
+
+  it("posts the message, shows sending…, then 'showing' ONLY on the reported id", async () => {
+    renderPage();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: 7, expires_at: future(), ttl_s: 120 }, 202),
+    );
+
+    const input = screen.getByLabelText("Message for the panel");
+    await act(async () => {
+      await fireEvent.input(input, { target: { value: "Dinner in ten" } });
+    });
+    await click(screen.getByRole("button", { name: "Send" }));
+
+    const [url, options] = fetchMock.mock.calls.at(-1);
+    expect(url).toBe("/api/message");
+    expect(JSON.parse(options.body)).toEqual({ text: "Dinner in ten" });
+    expect(screen.getByText("sending…")).toBeTruthy();
+    expect(screen.queryByText("showing on the panel")).toBeNull();
+
+    // The board reports a DIFFERENT id: not ours yet.
+    await emitState({ state: "ambient", message_id: 6 });
+    expect(screen.getByText("sending…")).toBeTruthy();
+
+    // Now it reports ours: confirmed.
+    await emitState({ state: "ambient", message_id: 7 });
+    expect(screen.getByText("showing on the panel")).toBeTruthy();
+    expect(screen.queryByText("sending…")).toBeNull();
+  });
+
+  it("reports a busy panel as 'not idle', not as a routine conflict", async () => {
+    renderPage();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "panel_busy", state: "countdown" }, 409),
+    );
+    const input = screen.getByLabelText("Message for the panel");
+    await act(async () => {
+      await fireEvent.input(input, { target: { value: "Hello" } });
+    });
+    await click(screen.getByRole("button", { name: "Send" }));
+
+    expect(document.body.textContent).toContain("the panel isn't idle");
+    expect(screen.queryByRole("button", { name: "Replace" })).toBeNull();
+  });
+
+  it("shows a message the server is holding live (a second phone's view)", async () => {
+    const { container } = renderPage();
+    // Paint a snapshot carrying a live banner, as another phone's stream would.
+    await act(() => {
+      MockEventSource.last.emit("state", {
+        data: JSON.stringify({
+          type: "state",
+          state: {
+            ...makeSnapshot({ state: "ambient" }),
+            message: { id: 3, text: "Tea is ready", expires_at: future() },
+          },
+        }),
+      });
+    });
+    expect(container.textContent).toContain("Tea is ready");
   });
 });
 

@@ -71,6 +71,15 @@ export const config = Object.freeze({
   deviceToken,
   /** O6 — pending desired state is dropped after this many seconds (memo §5.4). */
   desiredTtlS: readNumber("DESIRED_TTL_S", 45),
+  /**
+   * How long an idle banner message stays live on the poll. Longer than the
+   * command TTL because a message is *content* (it loops while it is up), not a
+   * one-shot edge that must not fire late. It is still a server-side construct —
+   * the board never compares `expires_at` (`device-protocols.md` §3).
+   */
+  messageTtlS: readNumber("MESSAGE_TTL_S", 120),
+  /** The longest banner message accepted, in characters (`device-protocols.md` §3). */
+  messageMaxLen: readNumber("MESSAGE_MAX_LEN", 60),
   /** O4 — the cut-off behind `panel.online` (≈3× the 5 s idle poll). */
   offlineThresholdS: readNumber("OFFLINE_THRESHOLD_S", 15),
   /** O5 — server-side `next_poll_ms` clamp bounds. */

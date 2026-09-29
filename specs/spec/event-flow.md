@@ -41,7 +41,9 @@ buttons"* (memo §3). They are **not** events on the wire as such: the board car
 3. `reset` stays **silent** — a remote cancel must not play a tune; the phone carries the
    acknowledgement instead (memo §3, §11.13).
 4. **No fifth event exists, and inventing one is out of scope.** `+2 min` would need an `extend`
-   event, which is exactly why it is deferred (memo §12).
+   event, which is exactly why it is deferred (memo §12). The idle scrolling banner (`ui/design-system.md`
+   §10) is deliberately **not** an exception: it is idle-screen *content* written to
+   and echoed from a slot of its own, not a device event — see §2 below.
 
 **No event ordering, retries, acks or dedup are carried by this vocabulary** — the reconciliation
 model supplies all of that with one comparison (memo §5.2). See `api/device-protocols.md`.
@@ -56,7 +58,7 @@ Not an event — a snapshot, sent on every poll. Frame content is the `Observed`
 ```jsonc
 { "boot": "9f3c1a22", "fw": "0.2.0", "applied_gen": 18,
   "state": "countdown", "routine": "bathtime", "remaining_s": 214,
-  "rssi": -41, "uptime_s": 3820 }
+  "rssi": -41, "uptime_s": 3820, "message_id": 4 }
 ```
 
 Two of these fields are event-*like* because a change in them is meaningful and is logged:
@@ -66,6 +68,11 @@ Two of these fields are event-*like* because a change in them is meaningful and 
 | `boot` differs from the last seen value | the panel rebooted | **clear pending desired**, audit `action='boot'`, mirror to AMBIENT (memo §5.6) |
 | `applied_gen` reaches the current `gen` | the command landed | audit `outcome='applied'`; the UI may confirm (memo §9.1) |
 | `state` changes | progress through the state machine | mirror update; cadence input (memo §6.3.5) |
+
+`message_id` is the idle-banner's *content* acknowledgement — the id of the banner the panel is
+currently drawing, or absent when it is drawing none. It is **not a fifth device event** (§1,
+invariant 4): it carries no `gen`, moves no `gen`, and the server drops the banner the moment the
+panel reports leaving `ambient` (`api/device-protocols.md` §3.0).
 
 ---
 
@@ -127,6 +134,7 @@ work" into a record rather than an argument (memo §7.3, §9.1):
 | `cancel` | as above (`noop` when nothing was running) | "did the cancel land?" |
 | `replace` | `accepted`, `applied`, `expired`, `conflict` | "did the switch happen, and was it asked for?" |
 | `boot` | `noop` (informational) | "when did the panel reboot?" (memo §5.6) |
+| `message` | `accepted`, `expired`, `refused_offline`, `noop` | "did the idle banner go up, and where did it go?" (§10; not a routine — see `device-protocols.md` §3.0) |
 | `poll` (optional summary) | — | network-window churn, and **what the poll last reported and when** (memo §9.1, §11.15) |
 
 **Never logged:** the device token, WiFi credentials, the Access JWT, or any credential (memo §10).

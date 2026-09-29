@@ -46,9 +46,9 @@ paths:
       description: >
         One SvelteKit route (`src/routes/+page.svelte`) — mobile-first, deliberately small; it is a
         remote, not a control panel (memo §9). Four controls mirroring the panel (duck / book /
-        toy-box / Cancel), a live mirror of state/routine/remaining, and a conflict affordance.
-        Handlers call the `/api/*` endpoints below; no logic lives in the browser that is not also
-        in the server.
+        toy-box / Cancel), a live mirror of state/routine/remaining, a conflict affordance, and an
+        **idle-only message composer** (shown only while the panel is idle). Handlers call the
+        `/api/*` endpoints below; no logic lives in the browser that is not also in the server.
       responses:
         "200":
           description: The HTML Shell.
@@ -187,6 +187,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PanelOffline"
+  /api/message:
+    post:
+      tags: [ui]
+      summary: Scroll a short message across the panel's idle screen
+      description: >
+        **Idle-only.** Sets the idle banner slot: a short text the panel scrolls while it is idle
+        (AMBIENT). It is idle-screen *content*, not a fifth device event and not a `gen` command —
+        it moves no counter the board reconciles a button against (`device-protocols.md` §3.0). It
+        is refused unless the panel is reachable AND reporting `ambient`, because a scroll over a
+        running countdown would say nothing true. A success here means **accepted, not done**: the
+        board confirms by reporting the id it is drawing as `message_id`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageRequest"
+      responses:
+        "202":
+          description: Banner set. The board will scroll it on its next idle poll.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageAck"
+        "409":
+          description: The panel is not idle (a countdown is running). Nothing was set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelBusy"
+        "422":
+          description: Bad body, or text that is empty, too long, or not printable ASCII. Never echoed back.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The panel is offline. Nothing was set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PanelOffline"
   /device/poll:
     get:
       tags: [device]
@@ -273,6 +315,14 @@ paths:
           schema:
             type: string
             enum: [sun, partly, cloud, fog, rain, snow, thunder]
+        - name: message_id
+          in: query
+          required: false
+          description: >
+            The id of the idle banner the board is currently scrolling, relayed verbatim. Absent means
+            "showing no message". It is how the phone learns a message landed — the board echoing the
+            id it was told to draw (device-protocols.md §3.0).
+          schema: { type: integer, minimum: 0 }
       responses:
         "200":
           description: Desired state and the poll cadence.
@@ -466,6 +516,13 @@ components:
           description: >
             The board's temperature in whole degrees Celsius, relayed verbatim. Present only when the
             board has a reading, and only ever as a pair with `condition`.
+        message_id:
+          type: integer
+          minimum: 0
+          description: >
+            The id of the idle banner the board is currently drawing, relayed verbatim. Present only
+            while it is scrolling a message; it is the acknowledgement that a `POST /api/message`
+            landed (device-protocols.md §3.0).
     PanelLiveness:
       type: object
       description: >
@@ -500,6 +557,11 @@ components:
             - $ref: "#/components/schemas/PanelLiveness"
         desired:
           $ref: "#/components/schemas/Desired"
+        message:
+          description: The live idle banner, or `null` when there is none (or it has expired).
+          oneOf:
+            - $ref: "#/components/schemas/Message"
+            - type: "null"
         routines:
           type: array
           items: { $ref: "#/components/schemas/Routine" }
@@ -528,15 +590,61 @@ components:
       type: object
       description: >
         Desired state **and** the cadence. `next_poll_ms` is server-generated and clamped; the board
-        obeys it, further bounded by the floors/ceilings in its `config.py` (memo §6.3.5).
+        obeys it, further bounded by the floors/ceilings in its `config.py` (memo §6.3.5). `message`
+        is idle-screen content, not a fifth device event: it moves no `gen` (device-protocols.md §3.0).
       required: [gen, action, next_poll_ms]
       properties:
         gen: { type: integer, minimum: 0 }
         action: { $ref: "#/components/schemas/DesiredAction" }
         routine: { $ref: "#/components/schemas/RoutineId" }
+        message:
+          $ref: "#/components/schemas/Message"
         next_poll_ms:
           type: integer
-          description: ~5000 when nothing is pending, no countdown is active and no viewer is connected; ~2000 when any of those is true (memo §6.3.5).
+          description: ~5000 when nothing is pending, no countdown is active, no viewer is connected and no banner is up; ~2000 when any of those is true (memo §6.3.5).
+    Message:
+      type: object
+      description: >
+        The live idle banner: a short text the board scrolls across its idle (AMBIENT) screen, with a
+        monotonic `id`. Relayed on every poll while it is live; absent means "no banner". It is
+        idle-screen content, not a device event, and it carries no `gen` (device-protocols.md §3.0).
+      required: [id, text]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          description: Monotonic. The board echoes the id it is drawing back as `message_id`.
+        text:
+          type: string
+          description: Short printable-ASCII text, bounded by MESSAGE_MAX_LEN (default 60).
+    MessageRequest:
+      type: object
+      required: [text]
+      additionalProperties: false
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: >
+            The message to scroll. Printable ASCII only (space–tilde) with at least one visible
+            character, and at most MESSAGE_MAX_LEN characters. Never echoed back in a response.
+    MessageAck:
+      type: object
+      description: >
+        Accepted, **not done**. The board confirms by reporting the id it is scrolling as
+        `message_id`; the UI shows "showing on the panel" only then (memo §9.1).
+      required: [id, expires_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        expires_at: { type: integer }
+        ttl_s: { type: integer }
+    PanelBusy:
+      type: object
+      required: [error, state]
+      properties:
+        error: { type: string, const: panel_busy }
+        state: { $ref: "#/components/schemas/PanelState" }
     Conflict:
       type: object
       required: [error, current_routine, offers]

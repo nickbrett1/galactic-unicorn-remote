@@ -43,6 +43,58 @@ export const NEXT_POLL_FAST_MS = 2000;
 /** ~5000 ms idle: a ceiling on how stale an empty house may be, not a knob (memo §11.2). */
 export const NEXT_POLL_IDLE_MS = 5000;
 
+/** The longest banner message default, in characters (`config.js` carries the live value). */
+export const MESSAGE_MAX_LEN_DEFAULT = 60;
+
+/**
+ * Printable ASCII only — space (0x20) through tilde (0x7e). The panel's LED font
+ * has no glyph for anything else, and restricting the set keeps a message to the
+ * single row the board scrolls. Not a security boundary: the value is never
+ * echoed and the panel is a toddler-facing display (memo §10).
+ */
+const PRINTABLE_ASCII = /^[\x20-\x7e]+$/;
+
+/**
+ * A banner message is valid when it is a non-empty, in-bounds run of printable
+ * ASCII with at least one visible (non-space) character.
+ *
+ * @param {unknown} text
+ * @param {number} [maxLen]
+ * @returns {boolean}
+ */
+export function isValidMessageText(text, maxLen = MESSAGE_MAX_LEN_DEFAULT) {
+  if (typeof text !== "string") return false;
+  if (text.length < 1 || text.length > maxLen) return false;
+  if (!PRINTABLE_ASCII.test(text)) return false;
+  return text.trim().length > 0;
+}
+
+/**
+ * Is a banner message still live at `nowEpochS`? Expiry, like the desired TTL, is
+ * a **server-side** construct — the board has no clock and never compares
+ * `expires_at` (`device-protocols.md` §3).
+ *
+ * @param {{expires_at: number} | null | undefined} message
+ * @param {number} nowEpochS
+ * @returns {boolean}
+ */
+export function isMessageLive(message, nowEpochS) {
+  if (!message) return false;
+  return nowEpochS < message.expires_at;
+}
+
+/**
+ * A banner may only ever be set — and only ever shown — on the idle screen. The
+ * panel must be reachable AND reporting `ambient`; anything else (prompt,
+ * countdown, handoff) is refused before anything is written (memo §5.5, §9).
+ *
+ * @param {{state?: string, online?: boolean}} panel
+ * @returns {boolean}
+ */
+export function canShowMessage(panel) {
+  return panel?.online !== false && panel?.state === "ambient";
+}
+
 /**
  * `applied_gen <= gen` is ignored by the board (`device-protocols.md` §3), so the
  * command has landed once the board reports `applied_gen >= gen`.
@@ -150,10 +202,15 @@ export function resolveCommand({ requested, routine, panel }) {
  * Server-directed, demand-driven cadence (`device-protocols.md` §6): ~2000 ms if
  * any demand input is true, ~5000 ms otherwise, then clamped (O5).
  *
+ * `messageActive` is a demand input too: while a banner is live the board is
+ * idle and we want it to fetch the message promptly and to notice its expiry
+ * promptly, rather than waiting out a 5 s idle interval.
+ *
  * @param {{
  *   pendingApply?: boolean,
  *   activeCountdown?: boolean,
  *   subscribers?: number,
+ *   messageActive?: boolean,
  *   minMs?: number,
  *   maxMs?: number,
  * }} [input]
@@ -164,12 +221,16 @@ export function nextPollMs(input = {}) {
     pendingApply = false,
     activeCountdown = false,
     subscribers = 0,
+    messageActive = false,
     minMs = NEXT_POLL_MIN_MS_DEFAULT,
     maxMs = NEXT_POLL_MAX_MS_DEFAULT,
   } = input;
 
   const demand =
-    Boolean(pendingApply) || Boolean(activeCountdown) || subscribers > 0;
+    Boolean(pendingApply) ||
+    Boolean(activeCountdown) ||
+    subscribers > 0 ||
+    Boolean(messageActive);
   const raw = demand ? NEXT_POLL_FAST_MS : NEXT_POLL_IDLE_MS;
 
   return Math.min(Math.max(raw, minMs), maxMs);

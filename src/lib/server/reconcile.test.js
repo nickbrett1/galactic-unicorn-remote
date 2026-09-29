@@ -12,10 +12,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  canShowMessage,
   DEVICE_EVENTS,
   eventForDesired,
   isExpired,
   isGenApplied,
+  isMessageLive,
+  isValidMessageText,
   NEXT_POLL_FAST_MS,
   NEXT_POLL_IDLE_MS,
   nextPollMs,
@@ -246,11 +249,48 @@ describe("conflict policy — the seven rows of device-protocols.md §5, verbati
   });
 });
 
+describe("the idle banner — idle-screen content, never a fifth device event", () => {
+  it("accepts short printable-ASCII text and rejects the rest", () => {
+    expect(isValidMessageText("Dinner in ten")).toBe(true);
+    expect(isValidMessageText("  x  ")).toBe(true);
+    expect(isValidMessageText("a".repeat(60))).toBe(true);
+
+    expect(isValidMessageText("")).toBe(false);
+    expect(isValidMessageText("   ")).toBe(false);
+    expect(isValidMessageText(null)).toBe(false);
+    expect(isValidMessageText(42)).toBe(false);
+    expect(isValidMessageText("a".repeat(61))).toBe(false);
+    // A newline or a non-ASCII glyph has no cell on the panel's font.
+    expect(isValidMessageText("two\nlines")).toBe(false);
+    expect(isValidMessageText("café")).toBe(false);
+    // The bound is a parameter, so the caller passes config's value.
+    expect(isValidMessageText("12345", 5)).toBe(true);
+    expect(isValidMessageText("123456", 5)).toBe(false);
+  });
+
+  it("reads an unset/expired banner as not live (expiry is server-side)", () => {
+    expect(isMessageLive(null, 0)).toBe(false);
+    expect(isMessageLive(undefined, 0)).toBe(false);
+    expect(isMessageLive({ expires_at: 1000 }, 999)).toBe(true);
+    expect(isMessageLive({ expires_at: 1000 }, 1000)).toBe(false);
+  });
+
+  it("only ever allows a banner while the panel is reachable AND idle", () => {
+    expect(canShowMessage({ state: "ambient", online: true })).toBe(true);
+    for (const state of ["prompt", "countdown", "handoff"]) {
+      expect(canShowMessage({ state, online: true })).toBe(false);
+    }
+    // Offline is never idle, whatever the last state said.
+    expect(canShowMessage({ state: "ambient", online: false })).toBe(false);
+  });
+});
+
 describe("nextPollMs — demand-driven cadence", () => {
-  it("returns 2000 for each of the three demand inputs", () => {
+  it("returns 2000 for each of the four demand inputs", () => {
     expect(nextPollMs({ pendingApply: true })).toBe(NEXT_POLL_FAST_MS);
     expect(nextPollMs({ activeCountdown: true })).toBe(NEXT_POLL_FAST_MS);
     expect(nextPollMs({ subscribers: 1 })).toBe(NEXT_POLL_FAST_MS);
+    expect(nextPollMs({ messageActive: true })).toBe(NEXT_POLL_FAST_MS);
   });
 
   it("returns 5000 when none of them is true", () => {

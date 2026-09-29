@@ -28,11 +28,16 @@ GET /device/poll
       &reset_cause=<n>                       # how the PREVIOUS boot ended
       &temp_c=<n>                            # whole degrees C, sent WITH condition
       &condition=<sun|partly|cloud|fog|rain|snow|thunder>   # the board's own sky
+      &message_id=<n>                        # the idle banner the board is drawing, if any
 ```
 
 ```jsonc
 // 200 OK — desired state AND the cadence
 { "gen": 18, "action": "start", "routine": "bathtime", "next_poll_ms": 2000 }
+
+// 200 OK — with an idle banner live, the board also scrolls this text
+{ "gen": 18, "action": "none", "next_poll_ms": 2000,
+  "message": { "id": 4, "text": "Dinner in ten" } }
 ```
 
 - **Request is a `GET` with query parameters** — no body to serialise, and `urequests.get` is the call
@@ -41,6 +46,14 @@ GET /device/poll
   `gc.collect()`s before the request; the largest contiguous heap block is 16 KB (memo §16, §6.3).
 - **`action` ∈ `start` | `cancel` | `none`.** `none` is a valid, idempotent answer: nothing should be
   true that isn't. It is what the server returns when there is no desired state or the TTL expired.
+- **`message` is idle-screen content, not a fifth device event.** When present it carries a short text
+  the board scrolls across the **idle (AMBIENT) screen** — the one screen the panel has for content —
+  plus a monotonic `id`. It is deliberately *not* a `gen` command: it moves no counter and touches no
+  slot the board reconciles a button against. It travels the way the weather does, relayed on the
+  poll the board already makes, and the board acknowledges it by reporting the `id` it is drawing as
+  `message_id`. Absent means "no banner" — the normal idle screen. A banner can only be set while the
+  panel is idle (refused otherwise, §3.0) and is dropped the moment it expires or the board reports it
+  has left AMBIENT.
 - **`token`** is a shared secret, defence in depth only. Its exact transport (query parameter vs
   header) is an **open decision** (description.md §6.4); this spec proposes the query parameter above
   because the request is already a query-parameter GET and it adds nothing to MicroPython. It is
@@ -104,8 +117,11 @@ countdown, the *server* orchestrates cancel → wait → start.
   "state": "countdown", "routine": "bathtime", "remaining_s": 214,
   "rssi": -41, "uptime_s": 3820,
   "wedge": "heap0.link0.other0.cy0.rec0.pk0", "reset_cause": 1,
-  "temp_c": 18, "condition": "partly" }
+  "temp_c": 18, "condition": "partly", "message_id": 4 }
 ```
+
+The **banner slot** (below) is the one idle-screen *content* slot the server holds alongside the
+desired slot, and `message_id` is the board's acknowledgement of it — not a `gen` and not an event.
 
 - **`gen` is a monotonic counter both sides agree on** (memo §5.1). The board persists `applied_gen`
   to flash (a few writes a day — wear is a non-issue) and **ignores anything `<= applied_gen`**.
@@ -137,6 +153,28 @@ countdown, the *server* orchestrates cancel → wait → start.
   render the same indicator from the same relayed pair (and the same glyph masks as the firmware), so
   neither can drift from the panel.
 
+### 3.0 The idle banner slot (idle-only content)
+
+A parent can ask the panel to **scroll a short message across its idle screen**. This is the one
+capability the remote adds that is not a button mimic, and it is fenced accordingly:
+
+- **Idle-only, at every layer.** The server refuses to set a banner unless the panel is reachable AND
+  reporting `ambient` (`POST /api/message` → 503 offline, 409 `panel_busy` otherwise); the UI offers
+  the composer only on the idle screen; and the board draws it only in AMBIENT. A scroll over a
+  running countdown would say nothing true, so it never happens.
+- **Content, not an event.** A banner is *what should be on the idle screen*, so it is relayed on
+  every poll (like `temp_c`/`condition`) and carries a monotonic `id`. It is **not** a fifth entry in
+  the four-event vocabulary, moves no `gen`, and is invisible to the reconcile loop.
+- **Server-side expiry, no board clock.** The banner has its own `expires_at` (server construct,
+  `MESSAGE_TTL_S`), and the server stops sending it once it lapses; the board never compares a time.
+  A banner is also dropped the instant the board reports it has left AMBIENT, so it cannot reappear
+  stale after a countdown.
+- **Confirmed by the board.** The board reports the `id` it is currently scrolling as `message_id`;
+  the UI goes "sending…" → "showing on the panel" only when that id matches — the same
+  sent-vs-done rule the four panel controls obey (§9.1).
+- **Bounded and inert.** Text is short (≤ `MESSAGE_MAX_LEN`), printable ASCII only, and is never
+  echoed into a response.
+
 ### 3.1 Restart safety, both directions
 
 - A **fresh server** re-seeds `gen` from the `applied_gen` the board reports, **plus one**, so it can
@@ -146,12 +184,14 @@ countdown, the *server* orchestrates cancel → wait → start.
   wrong wedges the system silently: the panel ignores everything and merely looks "offline"
   (memo §11.6).
 
-### 3.2 New `boot` id clears pending desired
+### 3.2 New `boot` id clears pending desired (and the banner)
 
 The **server clears pending desired state the moment it sees a new `boot` id** (memo §5.6). Two
 independent guards make "the panel reboots and immediately re-runs the last command" impossible:
-this clearing, and the persisted `applied_gen`. The server logs boot-id changes, which informally
-makes this service the panel's health monitor (memo §5.6, §11.5).
+this clearing, and the persisted `applied_gen`. The **banner slot is cleared alongside it** — a
+message that was scrolling before a reboot must not resume on a panel nobody is watching. The server
+logs boot-id changes, which informally makes this service the panel's health monitor
+(memo §5.6, §11.5).
 
 **No auto-resume, deliberately:** a countdown that reappears after the child has moved on is worse
 than one that quietly ended (memo §5.6).
@@ -198,13 +238,14 @@ The panel's rules are ground truth, so the server resolves (memo §5.5):
 ## 6. The cadence (server-directed, demand-driven)
 
 Every poll response carries `next_poll_ms`; the board obeys it, clamped by the floors in its
-`config.py` (memo §5.1, §6.3.5). The server computes it from three things it already knows:
+`config.py` (memo §5.1, §6.3.5). The server computes it from four things it already knows:
 
 | Condition | `next_poll_ms` |
 |---|---|
 | desired not yet applied (`gen > applied_gen`) | ~2000 |
 | a countdown or HANDOFF is active | ~2000 |
 | **a live SSE subscriber is connected** | ~2000 |
+| **a live banner is up** (§3.0) | ~2000 |
 | none of the above | **~5000** |
 
 Opening the page is itself the signal of intent, so the panel is already polling fast when a button

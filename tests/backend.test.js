@@ -17,17 +17,20 @@ import { GET as getState } from "../src/routes/api/state/+server.js";
 import { POST as postStart } from "../src/routes/api/start/+server.js";
 import { POST as postCancel } from "../src/routes/api/cancel/+server.js";
 import { POST as postReplace } from "../src/routes/api/replace/+server.js";
+import { POST as postMessage } from "../src/routes/api/message/+server.js";
 import { classifyDoor, handle, init } from "../src/hooks.server.js";
-import { assertRuntimeConfig } from "../src/lib/server/config.js";
+import { assertRuntimeConfig, config } from "../src/lib/server/config.js";
 import {
   beginReplaceSequence,
   getDesired,
   getGen,
+  getMessage,
   getObserved,
   nowEpochS,
   recordObserved,
   resetState,
   setDesired,
+  setMessage,
 } from "../src/lib/server/state.js";
 
 const TOKEN = "test-device-token";
@@ -479,6 +482,139 @@ describe("/api/replace — cancel → wait → start, never a silent switch", ()
   });
 });
 
+describe("/api/message — the idle-only banner", () => {
+  it("202s from idle and stores a banner with its own id (accepted, not done)", async () => {
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+    const res = await post(postMessage, { text: "Dinner in ten" });
+    expect(res.status).toBe(202);
+    const body = await res.json();
+    expect(body).toMatchObject({ id: 1, ttl_s: config.messageTtlS });
+    expect(getMessage().text).toBe("Dinner in ten");
+    // It moves no gen: a message is idle-screen content, not a device command.
+    expect(getGen()).toBe(0);
+  });
+
+  it("422s a bad body or text, never echoing the value", async () => {
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+    const badBodies = [
+      null,
+      {},
+      { text: "x", extra: 1 },
+      { text: "" },
+      { text: "   " },
+      { text: "a".repeat(config.messageMaxLen + 1) },
+      { text: "two\nlines" },
+      { text: "café" },
+      { text: 42 },
+    ];
+    for (const body of badBodies) {
+      const res = await post(postMessage, body);
+      expect(res.status, JSON.stringify(body)).toBe(422);
+      const parsed = await res.json();
+      expect(parsed).not.toHaveProperty("text");
+    }
+    expect(getMessage()).toBeNull();
+  });
+
+  it("409s panel_busy while the panel is counting down, setting nothing", async () => {
+    recordObserved(
+      pollReport({ state: "countdown", routine: "bathtime", remaining_s: 200 }),
+      nowEpochS(),
+    );
+    const res = await post(postMessage, { text: "Hello" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "panel_busy",
+      state: "countdown",
+    });
+    expect(getMessage()).toBeNull();
+  });
+
+  it("503s an offline panel and sets nothing", async () => {
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS() - 180);
+    const res = await post(postMessage, { text: "Hello" });
+    expect(res.status).toBe(503);
+    expect(getMessage()).toBeNull();
+  });
+});
+
+describe("/device/poll — the idle banner relay", () => {
+  it("relays a live banner and its board-reported id, and polls fast", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    setMessage({ text: "Dinner in ten", nowS: nowEpochS() });
+
+    const res = await poll({
+      url: pollUrl({ boot: "b1", state: "ambient", message_id: "1" }),
+    });
+    const body = await res.json();
+    expect(body.message).toEqual({ id: 1, text: "Dinner in ten" });
+    // A live banner is demand: the board should fetch/expire it promptly.
+    expect(body.next_poll_ms).toBe(2000);
+    // The board's own admission of what it is drawing, relayed verbatim.
+    expect(getObserved().message_id).toBe(1);
+  });
+
+  it("omits the banner and idles at 5000ms when there is none", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    const res = await poll({ url: pollUrl({ boot: "b1", state: "ambient" }) });
+    const body = await res.json();
+    expect(body).not.toHaveProperty("message");
+    expect(body.next_poll_ms).toBe(5000);
+  });
+
+  it("drops an expired banner instead of queueing it", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    setMessage({ text: "Old", nowS: nowEpochS() - 1000 });
+
+    const res = await poll({ url: pollUrl({ boot: "b1", state: "ambient" }) });
+    const body = await res.json();
+    expect(body).not.toHaveProperty("message");
+    expect(getMessage()).toBeNull();
+  });
+
+  it("drops the banner the moment the panel leaves the idle screen", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    setMessage({ text: "Dinner in ten", nowS: nowEpochS() });
+
+    const res = await poll({
+      url: pollUrl({
+        boot: "b1",
+        state: "countdown",
+        routine: "bathtime",
+        remaining_s: "200",
+      }),
+    });
+    expect(await res.json()).not.toHaveProperty("message");
+    expect(getMessage()).toBeNull();
+  });
+
+  it("clears a pending banner on a new boot id (§3.2)", async () => {
+    const { readAuditLog } = await import("../src/lib/server/audit.js");
+    poll({ url: pollUrl({ boot: "b1" }) });
+    setMessage({ text: "Dinner in ten", nowS: nowEpochS() });
+    const before = readAuditLog().length;
+
+    const res = await poll({ url: pollUrl({ boot: "b2" }) });
+    expect(await res.json()).not.toHaveProperty("message");
+    expect(getMessage()).toBeNull();
+
+    // Only the rows this scenario appended: the log is shared across cases.
+    const rows = readAuditLog().slice(before);
+    const discarded = rows.find(
+      (r) => r.action === "message" && r.outcome === "expired",
+    );
+    expect(discarded).toBeTruthy();
+    expect(discarded.detail).toMatch(/reboot/i);
+  });
+
+  it("422s a malformed message_id", async () => {
+    for (const raw of ["-1", "abc", "1.5"]) {
+      const res = poll({ url: pollUrl({ message_id: raw }) });
+      expect(res.status, raw).toBe(422);
+    }
+  });
+});
+
 describe("/api/state — the snapshot and the 2 s fallback", () => {
   it("returns panel ∪ liveness, desired, the catalogue and the door", async () => {
     poll({
@@ -532,6 +668,22 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
     // nothing for it rather than a placeholder.
     expect(body.panel).not.toHaveProperty("condition");
     expect(body.panel).not.toHaveProperty("temp_c");
+  });
+
+  it("carries the live banner and reads an expired one as null", async () => {
+    setMessage({ text: "Dinner in ten", nowS: nowEpochS() });
+    const live = await getState({ locals: {} }).json();
+    expect(live.message).toMatchObject({ id: 1, text: "Dinner in ten" });
+
+    setMessage({ text: "Old", nowS: nowEpochS() - 1000 });
+    const expired = await getState({ locals: {} }).json();
+    expect(expired.message).toBeNull();
+  });
+
+  it("relays the id of the banner the board reports it is drawing", async () => {
+    poll({ url: pollUrl({ message_id: "4" }) });
+    const body = await getState({ locals: {} }).json();
+    expect(body.panel.message_id).toBe(4);
   });
 
   it("reads an empty desired slot as action 'none'", async () => {

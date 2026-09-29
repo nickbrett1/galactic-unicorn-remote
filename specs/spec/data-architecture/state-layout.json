@@ -22,7 +22,7 @@
     },
     "observed": {
       "type": "object",
-      "shape": "{ boot, fw, applied_gen, state, routine?, remaining_s?, rssi?, uptime_s?, wedge?, reset_cause?, condition?, temp_c?, received_at }",
+      "shape": "{ boot, fw, applied_gen, state, routine?, remaining_s?, rssi?, uptime_s?, wedge?, reset_cause?, condition?, temp_c?, message_id?, received_at }",
       "writer": "/device/poll only",
       "readers": ["/api/state (display)", "/api/events (display)", "audit log"],
       "invariant": "exactly one writer (the board) per direction; the server never writes this slot (memo §2)",
@@ -54,6 +54,19 @@
         "abandon": "panel offline past abandons_at, or a newer command supersedes this sequence"
       }
     },
+    "message": {
+      "type": "object | null",
+      "shape": "{ id, text, expires_at }",
+      "writer": "POST /api/message only, and only while the panel is idle (ambient)",
+      "readers": ["/device/poll (relay)", "/api/state (display)", "/api/events (display)"],
+      "counter": "messageSeq — a monotonic id of its own; it does NOT move `gen` (idle-screen content, not a device event)",
+      "ttl_s": 120,
+      "ttl_note": "longer than the command TTL because a banner is content that loops while up, not a one-shot edge that must not fire late; the constant (MESSAGE_TTL_S) is an OPEN DECISION (description.md §6.4). Expiry is enforced server-side; the board never compares expires_at (device-protocols.md §3.0).",
+      "on_expiry": "dropped: the board relays the banner only while it is live, and the server clears it once expires_at passes",
+      "on_leaving_idle": "dropped the moment the board reports a state other than ambient (never reappears over a countdown)",
+      "on_new_boot_id": "cleared immediately, alongside desired (a rebooted panel never shows a stale banner)",
+      "invariant": "exactly one writer (the phone); the board only echoes the id it is drawing, via observed.message_id. Idle-only content; moves no gen (device-protocols.md §3.0)"
+    },
     "routines": {
       "type": "array<{ id, label, symbol }>",
       "source": "routines.json — the SINGLE SOURCE OF TRUTH for ids and labels; no hard-coded labels anywhere (memo §12)",
@@ -64,7 +77,7 @@
   },
   "cadence": {
     "next_poll_ms": {
-      "computing_inputs": ["desired gen > applied_gen", "observed.state in {countdown, handoff}", "subscribers > 0"],
+      "computing_inputs": ["desired gen > applied_gen", "observed.state in {countdown, handoff}", "subscribers > 0", "a live idle banner is up"],
       "values": { "any_input_true_ms": 2000, "no_input_true_ms": 5000 },
       "invariant": "server-generated and clamped; the board further clamps to its config.py floors/ceilings (memo §6.3.5)",
       "open_decision": "the server-side clamp values (description.md §6.4)"
@@ -72,7 +85,7 @@
   },
   "persistence": {
     "must_survive_restart": ["nothing strictly (state is a mirror of the board's truth), but the audit log is expected to survive"],
-    "must_not_be_trusted_across_a_fresh_process": ["gen (re-seed from applied_gen + 1)", "desired (TTL has almost certainly expired)"],
+    "must_not_be_trusted_across_a_fresh_process": ["gen (re-seed from applied_gen + 1)", "desired (TTL has almost certainly expired)", "message (the panel has very likely left idle, or the TTL has elapsed — it is idle-only content with no reboot memory)"],
     "must_never_exist_here": ["a server-computed countdown / remaining_s source of truth (memo §5.3)", "a copy of the board's applied_gen as authority (the board's flash is authoritative)"]
   }
 }

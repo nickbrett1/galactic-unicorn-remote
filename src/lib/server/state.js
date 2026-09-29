@@ -33,6 +33,15 @@ function initialState() {
     subscribers: 0,
     replaceSequence: null,
     polled: false,
+    /**
+     * The idle banner slot — `{ id, text, expires_at }` or null. Distinct from
+     * `desired` and from `gen`: a message is idle-screen *content* (relayed on
+     * every poll, like the weather), not a fifth device event, so it moves no
+     * counter the board reconciles against (`device-protocols.md` §3).
+     */
+    message: null,
+    /** Monotonic banner revision. Lets the board restart the marquee on a NEW text. */
+    messageSeq: 0,
   };
 }
 
@@ -102,6 +111,36 @@ export function setDesired({
 
 export function clearDesired() {
   state.desired = null;
+  broadcastState();
+}
+
+export function getMessage() {
+  return state.message;
+}
+
+/**
+ * Write the idle banner slot (the phone→board idle-screen content). It carries
+ * its own monotonic `id` and a server-side `expires_at`; it never touches `gen`.
+ *
+ * @param {{text: string, ttlS?: number, nowS?: number}} input
+ */
+export function setMessage({
+  text,
+  ttlS = config.messageTtlS,
+  nowS = nowEpochS(),
+}) {
+  state.messageSeq += 1;
+  state.message = {
+    id: state.messageSeq,
+    text,
+    expires_at: nowS + ttlS,
+  };
+  broadcastState();
+  return state.message;
+}
+
+export function clearMessage() {
+  state.message = null;
   broadcastState();
 }
 

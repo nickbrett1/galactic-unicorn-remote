@@ -1224,3 +1224,38 @@ The 0.1.41 that this boot is running is also the OTA-landed one, so the power cy
 that the release persisted: `version.txt` and `boot-ok.txt` survived plug power with the rollback slot
 already dropped. Both open items from this session are closed, and `lib/updater.py` on the board now
 matches HEAD (`0f68edcc…`, 43099 B, after `28d3438`), so no further USB deploy is outstanding.
+
+## Side addition — the idle-only scrolling message (2026-09-28, session 9)
+
+The board can now show a **short line of text scrolling across its idle screen** — "Dinner in ten",
+"Bath's ready". Like the weather indicator, this is **not a phase from `plan.md`**: an affordance requested
+once the panel was live. It is modelled as idle-screen **content**, not a device event (memo §3; there is
+still no fifth event): a third slot with its own monotonic id and a server-side TTL, invisible to the
+reconcile loop and to `gen`.
+
+**Idle-only, at every layer.** `POST /api/message` returns 503 `panel_offline` when the panel is offline and
+409 `panel_busy` when it is not idle (`commands.js::runMessage`, gated by `reconcile.js::canShowMessage`);
+the composer in `+page.svelte` is rendered only while `online && state === 'ambient'`; and the board draws
+the banner only in `AMBIENT`. The markup short-circuit is a courtesy — the server is the rule.
+
+**The slot.** `state.js` gains `message { id, text, expires_at }` + a `messageSeq` counter that moves **no
+`gen`**; `reconcile.js` gains the pure rules (`isValidMessageText`, `isMessageLive`, `canShowMessage`) and a
+fourth `nextPollMs` demand input (`messageActive`). `device/poll` relays a live banner to the board and
+**drops it** on TTL elapse, on the board reporting anything other than `ambient` ("dropped: panel left the
+idle screen"), or on a new boot id ("discarded: panel rebooted before the message landed") — so a banner can
+never reappear stale over a countdown. `snapshot.js` exposes `message` on `StateSnapshot`; the board echoes
+the id it is drawing back as `Observed.message_id`.
+
+**Sent-vs-done still holds (memo §9.1).** The banner's 202 carries an `id`, not a `gen`; `ui/command.js`
+confirms "showing on the panel" **only** when the reported `message_id` equals the id this phone sent. A
+busy 409 is `not_idle` — "the panel isn't idle — messages only show when it is" — and, unlike a routine
+conflict, offers **no Replace**.
+
+**Validation.** Printable ASCII only (0x20–0x7e), ≥ 1 non-blank char, ≤ `MESSAGE_MAX_LEN` (default 60, from
+`config.js`); newlines and non-ASCII are 422s because the panel's LED font has no glyph for them. The value
+is **never echoed back** — the UI shows the panel's acknowledged text, never a copy of what was typed.
+
+Gates (last run): `npx vitest run` **13 files / 213 tests all green** · `npm run lint` **0 errors** (47
+warnings, the usual sonarjs/security, plus the pre-existing poll complexity) · `npm run check` **0 errors /
+0 warnings** · prettier clean. Documented in `specs/spec/ui/design-system.md` §10, `api/device-protocols.md`
+§3.0, the OpenAPI, `event-flow.md`, `state-layout.json`, `domain-models.ts` and `audit-log-schema.sql`.

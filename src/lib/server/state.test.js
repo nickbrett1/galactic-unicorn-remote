@@ -9,11 +9,13 @@ import { config } from "./config.js";
 import {
   beginReplaceSequence,
   clearDesired,
+  clearMessage,
   clearReplaceSequence,
   decrementSubscribers,
   getDesired,
   getGen,
   getLiveness,
+  getMessage,
   getObserved,
   getReplaceSequence,
   getSubscriberCount,
@@ -23,6 +25,7 @@ import {
   resetState,
   seedGenFromBoard,
   setDesired,
+  setMessage,
 } from "./state.js";
 
 const POLL = {
@@ -73,6 +76,37 @@ describe("the desired slot — one writer (the phone)", () => {
     expect(getDesired()).toBeNull();
     // gen does not move back when the slot is cleared.
     expect(getGen()).toBe(1);
+  });
+});
+
+describe("the banner slot — idle-screen content, its own counter", () => {
+  it("starts empty and stamps its own monotonic id and TTL", () => {
+    expect(getMessage()).toBeNull();
+
+    const first = setMessage({ text: "Dinner in ten", nowS: 1000 });
+    expect(first).toEqual({
+      id: 1,
+      text: "Dinner in ten",
+      expires_at: 1000 + config.messageTtlS,
+    });
+
+    const second = setMessage({ text: "Bedtime", nowS: 1005 });
+    expect(second.id).toBe(2);
+    expect(getMessage().text).toBe("Bedtime");
+  });
+
+  it("moves no `gen` — a message is not a device command", () => {
+    setDesired({ action: "start", routine: "bathtime", nowS: 10 }); // gen = 1
+    setMessage({ text: "Hello", nowS: 11 });
+    expect(getGen()).toBe(1);
+  });
+
+  it("clears cleanly without rewinding the counter", () => {
+    setMessage({ text: "Hello", nowS: 10 });
+    clearMessage();
+    expect(getMessage()).toBeNull();
+    // The next message still gets a fresh id, so the board restarts the marquee.
+    expect(setMessage({ text: "Again", nowS: 20 }).id).toBe(2);
   });
 });
 

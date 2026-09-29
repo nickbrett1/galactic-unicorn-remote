@@ -250,10 +250,63 @@ describe("command status — the sent-vs-done reducer", () => {
     expect(reduceStatus(sending, { type: "wat" })).toBe(sending);
   });
 
+  it("carries a banner's id through sending and confirms on the reported id", () => {
+    const sending = reduceStatus(initialStatus(), {
+      type: "response",
+      httpStatus: 202,
+      body: { id: 7, expires_at: 1000 },
+      action: "message",
+      routine: null,
+    });
+    expect(sending).toEqual({
+      kind: "sending",
+      action: "message",
+      routine: null,
+      messageId: 7,
+      expiresAt: 1000,
+    });
+
+    // A different reported id is not our confirmation.
+    expect(
+      reduceStatus(sending, {
+        type: "snapshot",
+        snapshot: { panel: { message_id: 6, last_seen_s: 1 } },
+        nowMs: 900_000,
+      }),
+    ).toBe(sending);
+
+    expect(
+      reduceStatus(sending, {
+        type: "snapshot",
+        snapshot: { panel: { message_id: 7, last_seen_s: 1 } },
+        nowMs: 900_000,
+      }),
+    ).toEqual({ kind: "confirmed", action: "message", routine: null });
+  });
+
+  it("maps a busy 409 on a message to not_idle, not a routine conflict", () => {
+    expect(
+      reduceStatus(initialStatus(), {
+        type: "response",
+        httpStatus: 409,
+        body: { error: "panel_busy", state: "countdown" },
+        action: "message",
+        routine: null,
+      }),
+    ).toEqual({ kind: "not_idle", state: "countdown" });
+  });
+
   it("gives every status a word and a tone", () => {
     expect(statusText({ kind: "idle" })).toBeNull();
     expect(statusText({ kind: "sending" })).toBe("sending…");
     expect(statusText({ kind: "confirmed" })).toBe("confirmed");
+    expect(statusText({ kind: "confirmed", action: "message" })).toBe(
+      "showing on the panel",
+    );
+    expect(statusText({ kind: "not_idle", state: "countdown" })).toContain(
+      "isn't idle",
+    );
+    expect(statusTone({ kind: "not_idle" })).toBe("warn");
     expect(statusText({ kind: "expired", lastSeenS: 180 })).toBe(
       "the panel didn't answer (last seen 3m ago)",
     );

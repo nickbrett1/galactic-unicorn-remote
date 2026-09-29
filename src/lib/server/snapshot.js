@@ -9,18 +9,48 @@
  * display/audit only (memo §8.3).
  */
 
-import { isExpired } from "./reconcile.js";
+import { isExpired, isMessageLive } from "./reconcile.js";
 import { getRoutines } from "./routines.js";
 import {
   getDesired,
   getGen,
   getLiveness,
+  getMessage,
   getObserved,
   nowEpochS,
 } from "./state.js";
 
 /** The fallback door when no `hooks.server.js` classification is attached. */
 export const LAN_DOOR = Object.freeze({ kind: "lan", email: null });
+
+/**
+ * The observed fields the board MAY or may not report — every one is relayed
+ * **verbatim** and omitted when absent. The server never parses or re-derives
+ * any of them: `wedge` and `reset_cause` are the board's own diagnosis of
+ * itself, `condition`/`temp_c` are the sky it read, `message_id` is the banner
+ * it admits to drawing, and `remaining_s` is its own countdown
+ * (`device-protocols.md` §3; memo §5.3).
+ */
+const OPTIONAL_OBSERVED = Object.freeze([
+  "routine",
+  "remaining_s",
+  "rssi",
+  "uptime_s",
+  "wedge",
+  "reset_cause",
+  "condition",
+  "temp_c",
+  "message_id",
+]);
+
+/** @param {object} observed @returns {object} the present optional fields, nothing else */
+function relayOptional(observed) {
+  const out = {};
+  for (const key of OPTIONAL_OBSERVED) {
+    if (observed[key] !== undefined) out[key] = observed[key];
+  }
+  return out;
+}
 
 /**
  * Build the current `StateSnapshot` (OpenAPI `StateSnapshot`).
@@ -40,38 +70,7 @@ export function buildStateSnapshot({
         fw: observed.fw,
         applied_gen: observed.applied_gen,
         state: observed.state,
-        ...(observed.routine !== undefined
-          ? { routine: observed.routine }
-          : {}),
-        ...(observed.remaining_s !== undefined
-          ? { remaining_s: observed.remaining_s }
-          : {}),
-        ...(observed.rssi !== undefined ? { rssi: observed.rssi } : {}),
-        ...(observed.uptime_s !== undefined
-          ? { uptime_s: observed.uptime_s }
-          : {}),
-        // The board's own wedge tally (firmware lib/wedge.py), relayed
-        // verbatim like remaining_s: only the board can classify its own
-        // poll failures, so the server never parses or interprets it.
-        ...(observed.wedge !== undefined ? { wedge: observed.wedge } : {}),
-        // How the board's PREVIOUS boot ended (firmware machine.reset_cause(),
-        // relayed verbatim like wedge): 1 is a cold start, 3 is the watchdog
-        // latch that used to need a USB console to see. The server stores the
-        // number and never interprets it.
-        ...(observed.reset_cause !== undefined
-          ? { reset_cause: observed.reset_cause }
-          : {}),
-        // The idle screen's weather (firmware lib/weather.py), relayed
-        // verbatim like wedge and reset_cause: the board reads Open-Meteo
-        // itself and reports the temp_c + condition pair it is drawing, so the
-        // remote page and the tile draw the same indicator the panel draws.
-        // The service never asks a weather API of its own — a second reading
-        // would be free to disagree with the panel's. Absent means "no
-        // reading", which is normal, not a failure.
-        ...(observed.condition !== undefined
-          ? { condition: observed.condition }
-          : {}),
-        ...(observed.temp_c !== undefined ? { temp_c: observed.temp_c } : {}),
+        ...relayOptional(observed),
       }
     : { boot: null, fw: null, applied_gen: 0, state: "ambient" };
 
@@ -81,9 +80,16 @@ export function buildStateSnapshot({
       ? { ...desired }
       : { gen: getGen(), action: "none", expires_at: 0 };
 
+  // The live idle banner, or null. Expiry is a server-side construct, so an
+  // expired slot reads as "no message" here, exactly as an expired desired slot
+  // reads as `action: none` above (`device-protocols.md` §3).
+  const message = getMessage();
+  const messageView = isMessageLive(message, nowS) ? { ...message } : null;
+
   return {
     panel: { ...observedFields, ...liveness },
     desired: desiredView,
+    message: messageView,
     routines: getRoutines(),
     door: { kind: door.kind, email: door.email ?? null },
   };
