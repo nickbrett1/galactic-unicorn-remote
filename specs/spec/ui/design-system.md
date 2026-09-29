@@ -161,12 +161,14 @@ formatters** — the tile is the mirror of §3 with the controls removed.
   The drawing is inline SVG — no external artwork (§2, `tests/ui-lint.test.js`).
 - **The idle screen's weather is the panel's own.** When the board has a reading it relays `temp_c` +
   `condition` on the poll it already makes (it polls Open-Meteo itself — `device-protocols.md` §3), and
-  the idle card also shows a small dark chip: the temperature beside the **same 7 glyph masks the
-  firmware draws** (`lib/icons.py`), in the firmware's own palettes, ported cell-for-cell into
-  `$lib/ui/weather.js`. One `WeatherIndicator` component is imported by both `/` and `/tile`, so the
-  tile cannot drift from the remote — and neither can drift from the panel. With **no reading it
-  renders nothing** — no placeholder that looks like weather — and it appears on the idle screen only,
-  the one state the panel draws the weather in.
+  that reading is drawn **inside the idle card's picture of the panel** — centred on the 53x11 matrix,
+  as the panel itself draws it — from the **same 7 glyph masks the firmware draws** (`lib/icons.py`), in
+  the firmware's own palettes, ported cell-for-cell into `$lib/ui/weather.js`. It is *inside* the panel
+  picture, not a chip below it, because the weather is what the panel's screen is showing. One
+  `WeatherIndicator` component is imported by both `/` and `/tile` (its `variant="screen"` drops the
+  standalone chip chrome), so the tile cannot drift from the remote — and neither can drift from the
+  panel. With **no reading it renders nothing** — no placeholder that looks like weather — and it appears
+  on the idle screen only, the one state the panel draws the weather in.
 - **The three routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
   the same symbol language as the buttons, with no affordance to press.
 - **Not an API surface.** `/tile` is a page; it adds no route. (The one surface added since memo §6's

@@ -117,51 +117,52 @@
     {#if headline.idle}
       <!-- The idle headline is a picture of the panel itself: a 53x11 LED
            matrix, dark body, one lit pixel in the top-left. Inline only —
-           no external artwork (`tests/ui-lint.test.js`). -->
-      <svg
-        class="panel"
-        viewBox="0 0 53 11"
-        role="img"
-        aria-label="Panel: idle, top-left pixel lit"
-      >
-        <defs>
-          <pattern
-            id="panel-dots"
-            width="1"
-            height="1"
-            patternUnits="userSpaceOnUse"
-          >
-            <circle cx="0.5" cy="0.5" r="0.16" fill="var(--c-muted)" />
-          </pattern>
-        </defs>
-        <rect
-          x="0.25"
-          y="0.25"
-          width="52.5"
-          height="10.5"
-          rx="1.5"
-          fill="var(--c-surface)"
-          stroke="var(--c-muted)"
-          stroke-width="0.5"
+           no external artwork (`tests/ui-lint.test.js`). The panel's own idle
+           screen shows the weather, so the reading is drawn INSIDE this
+           picture (§9), not below it. -->
+      <span class="panel" role="img" aria-label="Panel: idle, top-left pixel lit">
+        <svg class="grid" viewBox="0 0 53 11" aria-hidden="true" focusable="false">
+          <defs>
+            <pattern
+              id="panel-dots"
+              width="1"
+              height="1"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="0.5" cy="0.5" r="0.16" fill="var(--c-muted)" />
+            </pattern>
+          </defs>
+          <rect
+            x="0.25"
+            y="0.25"
+            width="52.5"
+            height="10.5"
+            rx="1.5"
+            fill="var(--c-surface)"
+            stroke="var(--c-muted)"
+            stroke-width="0.5"
+          />
+          <rect
+            x="0.25"
+            y="0.25"
+            width="52.5"
+            height="10.5"
+            rx="1.5"
+            fill="url(#panel-dots)"
+            opacity="0.25"
+          />
+          <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
+        </svg>
+        <!-- The same reading the panel draws on its idle screen, from the same
+             component and the same firmware masks as `/` (design-system.md §9).
+             Drawn inside the picture; idle only, and no reading renders
+             nothing. -->
+        <WeatherIndicator
+          variant="screen"
+          condition={snapshot.panel?.condition}
+          tempC={snapshot.panel?.temp_c}
         />
-        <rect
-          x="0.25"
-          y="0.25"
-          width="52.5"
-          height="10.5"
-          rx="1.5"
-          fill="url(#panel-dots)"
-          opacity="0.25"
-        />
-        <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
-      </svg>
-      <!-- The same reading the panel draws on its idle screen, from the same
-           component and the same firmware masks as `/` (design-system.md §9).
-           Idle only, and no reading renders nothing. -->
-      <WeatherIndicator
-        condition={snapshot.panel?.condition}
-        tempC={snapshot.panel?.temp_c}
-      />
+      </span>
     {:else}
       <p class="headline">{headline.text}</p>
     {/if}
@@ -195,11 +196,16 @@
   }
 
   .panel {
+    position: relative;
     display: block;
     width: 100%;
     max-width: 180px;
-    height: auto;
     aspect-ratio: 53 / 11;
+  }
+  .panel .grid {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   .mirror {

@@ -15,8 +15,14 @@
    */
   import { weatherIcon, weatherLabel, weatherTemp } from "$lib/ui/weather.js";
 
-  /** @type {{condition?: string | null, tempC?: number | null}} */
-  let { condition = null, tempC = null } = $props();
+  /**
+   * `chip` (default) is the standalone dark chip. `screen` draws the same
+   * glyph and value with no chrome, centred on top of the idle card's picture
+   * of the panel — because the weather IS what the panel shows on its screen,
+   * so it belongs inside the drawing rather than below it.
+   *
+   * @type {{condition?: string | null, tempC?: number | null, variant?: 'chip' | 'screen'}} */
+  let { condition = null, tempC = null, variant = "chip" } = $props();
 
   const label = $derived(weatherLabel(condition));
   const temp = $derived(weatherTemp(tempC));
@@ -29,7 +35,7 @@
 
 {#if shown}
   <span
-    class="weather"
+    class="weather {variant}"
     role="img"
     aria-label={`${label}, ${temp}`}
     data-condition={condition}
@@ -74,5 +80,30 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
+  }
+
+  /* `screen`: no chip chrome — the glyph and value are drawn ON the panel
+     picture, centred, so they read as the panel's own screen content. The
+     absolute fill is what centres them against the panel frame behind. */
+  .weather.screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .weather.screen .glyph {
+    height: 62%;
+    /* Never taller than the frame it sits in, even if the glyph is 11 rows. */
+    max-height: 100%;
+  }
+
+  .weather.screen .temp {
+    font-size: clamp(0.85rem, 3.2vw, 1.15rem);
   }
 </style>

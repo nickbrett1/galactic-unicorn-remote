@@ -188,6 +188,10 @@ describe("D1 — the shell and its controls", () => {
     const chip = container.querySelector(".weather");
     expect(chip).toBeTruthy();
     expect(chip.getAttribute("aria-label")).toBe("Snow, -3C");
+    // It is drawn INSIDE the picture of the panel (the panel's own idle screen
+    // shows the weather), not below it as a separate chip.
+    expect(container.querySelector(".panel .weather")).toBe(chip);
+    expect(container.querySelector(".mirror > .weather")).toBeNull();
   });
 
   it("renders no weather when the board has no reading", () => {

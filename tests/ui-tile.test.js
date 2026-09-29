@@ -128,6 +128,9 @@ describe("the tile mirrors the remote, read-only", () => {
     expect(chip).toBeTruthy();
     expect(chip.getAttribute("data-condition")).toBe("partly");
     expect(chip.getAttribute("aria-label")).toBe("Partly cloudy, 18C");
+    // Drawn INSIDE the panel picture, where the panel itself shows it.
+    expect(container.querySelector(".panel .weather")).toBe(chip);
+    expect(container.querySelector(".mirror > .weather")).toBeNull();
   });
 
   it("renders no weather when the board has no reading", () => {
