@@ -86,37 +86,26 @@ describe("weatherIcon — the firmware masks, ported", () => {
   });
 
   it("maps each ink symbol to the condition's palette (cloud row 7)", () => {
-    // lib/icons.py `_CLOUD` row 7 is "OLLXXXXXXSSSSXXXXXXLLO": accent, two lit,
-    // six body, four shade, six body, two lit, accent — all four inks in one
-    // row, and the exact run breakdown the panel blits.
+    // lib/icons.py `_CLOUD` row 7 is "OLLXXXXXXXXXXXXXXXXLLO": accent, two lit,
+    // sixteen body, two lit, accent — the flanks stay rim/lit above the shaded
+    // base, and this is the exact run breakdown the panel blits.
     const row = weatherIcon("cloud").frames[0].filter((rect) => rect.y === 7);
     expect(row).toEqual([
       { x: 0, y: 7, w: 1, fill: WEATHER_PENS.cloud.accent },
       { x: 1, y: 7, w: 2, fill: WEATHER_PENS.cloud.lit },
-      { x: 3, y: 7, w: 6, fill: WEATHER_PENS.cloud.body },
-      { x: 9, y: 7, w: 4, fill: WEATHER_PENS.cloud.shade },
-      { x: 13, y: 7, w: 6, fill: WEATHER_PENS.cloud.body },
+      { x: 3, y: 7, w: 16, fill: WEATHER_PENS.cloud.body },
       { x: 19, y: 7, w: 2, fill: WEATHER_PENS.cloud.lit },
       { x: 21, y: 7, w: 1, fill: WEATHER_PENS.cloud.accent },
     ]);
   });
 
-  it("shades the cloud's underside as a lens, not a band", () => {
-    // The shade steps outward as it descends and never reaches the silhouette
-    // edge, so the flanks stay body ink (`lib/icons.py` `_CLOUD`).
-    const shadeWidths = [7, 8, 9].map((y) =>
-      weatherIcon("cloud")
-        .frames[0].filter(
-          (rect) => rect.y === y && rect.fill === WEATHER_PENS.cloud.shade,
-        )
-        .reduce((total, rect) => total + rect.w, 0),
-    );
-    expect(shadeWidths).toEqual([4, 8, 16]);
-    for (const y of [7, 8, 9]) {
+  it("shades the cloud's underside as a solid two-row band", () => {
+    // The shade is the cloud's floor: two full rows, inset one column each side,
+    // each drawn as one 20-wide shade run (`lib/icons.py` `_CLOUD`). Body ink no
+    // longer cuts into it on either row.
+    for (const y of [8, 9]) {
       const row = weatherIcon("cloud").frames[0].filter((rect) => rect.y === y);
-      // body ink stands on both sides of the shade run
-      expect(row[0].fill).not.toBe(WEATHER_PENS.cloud.shade);
-      expect(row[row.length - 1].fill).not.toBe(WEATHER_PENS.cloud.shade);
+      expect(row).toEqual([{ x: 1, y, w: 20, fill: WEATHER_PENS.cloud.shade }]);
     }
   });
 

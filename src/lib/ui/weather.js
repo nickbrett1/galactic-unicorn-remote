@@ -125,11 +125,10 @@ const PARTLY = [
 // (22 px): a wide silhouette of uneven terraces, lit on top and shadowed
 // underneath, with a quiet grey rim on the flanks.
 //
-// The underside shade is a LENS, not a band. It used to fill the bottom two
-// rows edge to edge, which read as a slab the cloud was sitting on; the shade
-// now steps outward as it descends (4 cells, then 8, then 16 in a 20-cell
-// base) and stops short of the silhouette on every row, so the flanks stay
-// body ink. Transcribed from `lib/icons.py` `_CLOUD` - see the note there.
+// The underside is a solid shaded BASE - two full rows, inset one column each
+// side and drawn as a single run per row - with the row above it left as body
+// ink between the lit flanks. Transcribed cell for cell from `lib/icons.py`
+// `_CLOUD`; do not "tidy" it, the phone must show the panel's own picture.
 const CLOUD = [
   "......................",
   "......................",
@@ -138,9 +137,9 @@ const CLOUD = [
   "...OXXXXLO..LLLLLLL...",
   "...OXXXXXXLLLLXXXLO...",
   "LLLXXXXXXXLLXXXXXXXLLL",
-  "OLLXXXXXXSSSSXXXXXXLLO",
-  ".XXXXXXSSSSSSSSXXXXXX.",
-  ".XXSSSSSSSSSSSSSSSSXX.",
+  "OLLXXXXXXXXXXXXXXXXLLO",
+  ".SSSSSSSSSSSSSSSSSSSS.",
+  ".SSSSSSSSSSSSSSSSSSSS.",
   "......................",
 ];
 
