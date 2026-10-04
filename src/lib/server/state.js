@@ -85,9 +85,16 @@ export function getReplaceSequence() {
  * Write the desired slot (the phone→board direction). Increments `gen`, which is
  * the only thing that ever advances it on a command edge.
  *
+ * `minutes` is the remote-selectable countdown length (T6): a whole number of
+ * minutes, one of `MINUTES_CHOICES`, carried **alongside** the `start` event the
+ * way `routine` is. It is per-command data, never a fifth event and never a
+ * persisted setting, so it is only ever written on a `start` (`device-protocols`
+ * §3). Absent means "the board's own routine default".
+ *
  * @param {{
  *   action: 'start' | 'cancel',
  *   routine?: string,
+ *   minutes?: number,
  *   ttlS?: number,
  *   nowS?: number,
  * }} input
@@ -95,6 +102,7 @@ export function getReplaceSequence() {
 export function setDesired({
   action,
   routine,
+  minutes,
   ttlS = config.desiredTtlS,
   nowS = nowEpochS(),
 }) {
@@ -103,6 +111,7 @@ export function setDesired({
     gen: state.gen,
     action,
     ...(routine ? { routine } : {}),
+    ...(action === "start" && minutes !== undefined ? { minutes } : {}),
     expires_at: nowS + ttlS,
   };
   broadcastState();
@@ -173,15 +182,22 @@ export function seedGenFromBoard(reportedAppliedGen) {
  * Begin the cancel → wait → start orchestration for a routine switch. `cancelled_gen`
  * is the gen of the cancel we are about to send; `abandons_at` is its TTL.
  *
- * @param {{target_routine: string, ttlS?: number, nowS?: number}} input
+ * `target_minutes` is the countdown length the requested switch asked for (T6),
+ * held here because the actual `start` is not sent until the panel reports
+ * `ambient`; without it a replace would silently drop the chosen length and fall
+ * back to the routine default.
+ *
+ * @param {{target_routine: string, target_minutes?: number, ttlS?: number, nowS?: number}} input
  */
 export function beginReplaceSequence({
   target_routine,
+  target_minutes,
   ttlS = config.desiredTtlS,
   nowS = nowEpochS(),
 }) {
   state.replaceSequence = {
     target_routine,
+    ...(target_minutes !== undefined ? { target_minutes } : {}),
     cancelled_gen: state.gen,
     started_at: nowS,
     abandons_at: nowS + ttlS,

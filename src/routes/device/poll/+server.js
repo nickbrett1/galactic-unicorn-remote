@@ -11,6 +11,7 @@
  * stalls (R3).
  */
 
+import { DEFAULT_MINUTES } from "../../../lib/minutes.js";
 import { appendAudit } from "../../../lib/server/audit.js";
 import { config } from "../../../lib/server/config.js";
 import { jsonResponse } from "../../../lib/server/http.js";
@@ -367,6 +368,7 @@ export function GET({ url }) {
       const started = setDesired({
         action: "start",
         routine: replaceSeq.target_routine,
+        minutes: replaceSeq.target_minutes ?? DEFAULT_MINUTES,
         nowS,
       });
       clearReplaceSequence();
@@ -446,6 +448,12 @@ export function GET({ url }) {
   };
   if (pending && pending.action !== "none" && pending.routine) {
     body.routine = pending.routine;
+  }
+  // The remote-selectable countdown length (T6): carried only on a `start`,
+  // alongside `routine` — data, not a fifth event. The board applies it to the
+  // countdown it starts and never persists it.
+  if (pending && pending.action === "start" && pending.minutes !== undefined) {
+    body.minutes = pending.minutes;
   }
   // Present only while a banner is live; the board scrolls it on the idle
   // screen and echoes the id back as `message_id` to confirm it is drawing.

@@ -154,8 +154,47 @@ describe("D1 — the shell and its controls", () => {
       expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
     }
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
-    // No durations, no +2 min, no settings — nothing else is a button.
+    // No +2 min, no settings. The one chooser is the countdown length (§5, T6).
     expect(screen.queryByText(/\+2/)).toBeNull();
+  });
+
+  it("offers the 1/3/5-minute countdown length, defaulting to 5", () => {
+    renderPage();
+    for (const minutes of [1, 3, 5]) {
+      expect(
+        screen.getByRole("button", { name: `${minutes} min` }),
+      ).toBeTruthy();
+    }
+    // Default is 5: exactly one length is pressed, and it is 5.
+    expect(screen.getByRole("button", { name: "5 min" }).ariaPressed).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "1 min" }).ariaPressed).toBe(
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "3 min" }).ariaPressed).toBe(
+      "false",
+    );
+  });
+
+  it("sends the chosen countdown length on a start", async () => {
+    renderPage();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { gen: 5, action: "start", routine: "bathtime", minutes: 3 },
+        202,
+      ),
+    );
+
+    await click(screen.getByRole("button", { name: "3 min" }));
+    await click(screen.getByRole("button", { name: "Bathtime" }));
+
+    const [url, options] = fetchMock.mock.calls.at(-1);
+    expect(url).toBe("/api/start");
+    expect(JSON.parse(options.body)).toEqual({
+      routine: "bathtime",
+      minutes: 3,
+    });
   });
 
   it("shows the Access email only when it is present (display only)", () => {
@@ -440,7 +479,12 @@ describe("D2 — sent is never done", () => {
     await click(replace);
     const [url, options] = fetchMock.mock.calls.at(-1);
     expect(url).toBe("/api/replace");
-    expect(JSON.parse(options.body)).toEqual({ routine: "bathtime" });
+    // The replace carries the chosen length too (T6), so a switch cannot
+    // silently drop it; the default is 5.
+    expect(JSON.parse(options.body)).toEqual({
+      routine: "bathtime",
+      minutes: 5,
+    });
   });
 
   it("treats an offline refusal as a caveat, not a success", async () => {

@@ -9,6 +9,7 @@
  * an offline panel is refused before anything is written (memo §5.5).
  */
 
+import { DEFAULT_MINUTES, isValidMinutes } from "../minutes.js";
 import { appendAudit } from "./audit.js";
 import { config } from "./config.js";
 import { jsonResponse } from "./http.js";
@@ -72,10 +73,15 @@ function mapDoor(door) {
 }
 
 /**
- * Validate a command body: `{routine}` in `routines.json`, `additionalProperties:
- * false`, and no echoing of a rejected value (memo §10).
+ * Validate a command body: `{routine, minutes?}`, `additionalProperties: false`,
+ * and no echoing of a rejected value (memo §10).
  *
- * @returns {Promise<{ok: true, routine: string} | {ok: false}>}
+ * `minutes` is optional (T6): absent means the routine's own default, and a
+ * present value must be one of `MINUTES_CHOICES` (1, 3 or 5). The server always
+ * resolves it to an explicit integer so the board never has to guess — the
+ * board's fall-back exists only for an older server.
+ *
+ * @returns {Promise<{ok: true, routine: string, minutes: number} | {ok: false}>}
  */
 async function readRoutineBody(request) {
   let body;
@@ -86,9 +92,15 @@ async function readRoutineBody(request) {
   }
   if (!body || typeof body !== "object" || Array.isArray(body))
     return { ok: false };
-  if (Object.keys(body).some((key) => key !== "routine")) return { ok: false };
+  if (Object.keys(body).some((key) => key !== "routine" && key !== "minutes"))
+    return { ok: false };
   if (!isRoutineId(body.routine)) return { ok: false };
-  return { ok: true, routine: body.routine };
+  let minutes = DEFAULT_MINUTES;
+  if (body.minutes !== undefined) {
+    if (!isValidMinutes(body.minutes)) return { ok: false };
+    minutes = body.minutes;
+  }
+  return { ok: true, routine: body.routine, minutes };
 }
 
 /** The DesiredAck body: accepted, NOT done. */
@@ -101,6 +113,9 @@ function desiredAck(desired, extraRoutine) {
   };
   const routine = desired.routine ?? extraRoutine;
   if (routine) body.routine = routine;
+  if (desired.action === "start" && desired.minutes !== undefined) {
+    body.minutes = desired.minutes;
+  }
   return body;
 }
 
@@ -178,6 +193,7 @@ export async function runStart(request, door) {
   const desired = setDesired({
     action: "start",
     routine: parsed.routine,
+    minutes: parsed.minutes,
     nowS,
   });
   auditRow({
@@ -187,6 +203,7 @@ export async function runStart(request, door) {
     gen: desired.gen,
     door,
     nowS,
+    detail: `minutes=${parsed.minutes}`,
   });
   return jsonResponse(desiredAck(desired), 202);
 }
@@ -301,7 +318,11 @@ export async function runReplace(request, door) {
   // `cancelled_gen` as THAT cancel's gen — so the board reporting
   // `applied_gen >= cancelled_gen` is exactly "the cancel landed".
   const desired = setDesired({ action: "cancel", nowS });
-  beginReplaceSequence({ target_routine: parsed.routine, nowS });
+  beginReplaceSequence({
+    target_routine: parsed.routine,
+    target_minutes: parsed.minutes,
+    nowS,
+  });
   auditRow({
     action: "replace",
     outcome: "accepted",

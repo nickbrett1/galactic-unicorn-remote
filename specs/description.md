@@ -97,8 +97,10 @@ Explicitly **not** built here (each also recorded in `spec/implementation-consid
    suite replaces the other (memo §6.4, stack-memo §5).
 3. **`+2 min` / extending a running countdown** — deliberately deferred; it needs a new `extend`
    event, not a button mimic (memo §12).
-4. **Duration editing, settings, privilege tiers** — the panel has no such feature, so the remote
-   cannot either. This is what makes the Access identity-header trap inert (memo §8.3, §10).
+4. **Settings, privilege tiers, arbitrary duration editing** — the panel has no such feature, so the
+   remote cannot either. This is what makes the Access identity-header trap inert (memo §8.3, §10).
+   One bounded exception is the **remote-chosen countdown length** (T6): 1/3/5 minutes, default 5,
+   carried as data alongside the `start` — not a new event and not a persisted setting.
 5. **The phase-4 orchestrator** — the name `galactic-unicorn-remote` was chosen so the orchestrator
    name stays free (memo §7.1).
 6. **MQTT / ambient cards (phase 3)** — MQTT remains the right answer for phase 3, but no broker is
@@ -120,7 +122,7 @@ These are hard constraints for later phases. Each is settled in a memo; none is 
 | # | Decision | Source |
 |---|---|---|
 | AD-1 | **The panel stays the only timer.** The server holds a mirror, never a clock. `remaining_s` comes from the board's report; the browser interpolates and re-syncs. | memo §0, §5.3 |
-| AD-2 | **The remote is a second producer of button events**, not a new code path. Exactly four events: `bathtime`, `booktime`, `cleanup`, `reset`. Scope = start + cancel only. | memo §0, §3 |
+| AD-2 | **The remote is a second producer of button events**, not a new code path. Exactly four events: `bathtime`, `booktime`, `cleanup`, `reset`. Scope = start + cancel only; the one addition is the countdown length (T6), data alongside a `start`, not a fifth event. | memo §0, §3 |
 | AD-3 | **The board polls the NAS over plain HTTP** (~2 s active / ~5 s idle). Not MQTT, not an inbound listener. | memo §0, §4 |
 | AD-4 | **Every connection is outbound; nothing ever dials the board.** The board dials the NAS; the NAS dials Cloudflare. | memo §2, §4 |
 | AD-5 | **Server holds desired state with a monotonic `gen`; the device reconciles and reports `applied_gen`.** No clock on either side; `applied_gen` persisted to flash on the device. | memo §5.1 |

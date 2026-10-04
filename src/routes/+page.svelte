@@ -3,8 +3,9 @@
    * The remote — D1/D2/D3.
    *
    * Mobile-first and deliberately small: "a remote, not a control panel"
-   * (`spec/ui/design-system.md`). Exactly four controls (three routine buttons
-   * plus one Cancel), a live mirror, and the honest "sent vs done" states.
+   * (`spec/ui/design-system.md`). Four controls (three routine buttons plus one
+   * Cancel), one countdown-length chooser (1/3/5 min, default 5 — T6), a live
+   * mirror, and the honest "sent vs done" states.
    *
    * All of the wiring lives in pure helpers (`$lib/ui/format.js`,
    * `$lib/ui/command.js`) so the one hard UX rule is unit-testable. Routine ids,
@@ -12,6 +13,7 @@
    * hard-codes a label or a path (`design-system.md` §2).
    */
   import { onMount, untrack } from "svelte";
+  import { DEFAULT_MINUTES, MINUTES_CHOICES } from "$lib/minutes.js";
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
   import { toPanelText } from "$lib/ui/panel-text.js";
@@ -20,6 +22,11 @@
   let { data } = $props();
 
   const routines = $derived(data.snapshot.routines);
+
+  // The countdown length a start (or a replace) asks for: 1, 3 or 5 minutes,
+  // default 5. It rides ALONGSIDE the routine event — the panel still only
+  // ever gets the four button events; this is the length, not a fifth one.
+  let minutes = $state(DEFAULT_MINUTES);
 
   // The mirror paints from the last `StateSnapshot`; SSE keeps it live and the
   // 2 s `/api/state` poll is the indistinguishable fallback (memo §11.7).
@@ -85,7 +92,7 @@
     dispatch({ type: "snapshot", snapshot: next, nowMs: Date.now() });
   }
 
-  async function sendCommand(action, routine = null) {
+  async function sendCommand(action, routine = null, minutesChoice = null) {
     // Optimistic PRESS, never optimistic success (`design-system.md` §4).
     dispatch({ type: "press", action, routine });
     const url =
@@ -94,7 +101,12 @@
         : action === "replace"
           ? "/api/replace"
           : "/api/start";
-    const body = action === "cancel" ? {} : { routine };
+    // A cancel carries nothing; a start/replace carries the routine and the
+    // chosen length (defaulted server-side too, so an old client is honest).
+    const body =
+      action === "cancel"
+        ? {}
+        : { routine, ...(minutesChoice ? { minutes: minutesChoice } : {}) };
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -341,7 +353,7 @@
           type="button"
           class="replace"
           bind:this={replaceBtn}
-          onclick={() => sendCommand("replace", status.requested)}
+          onclick={() => sendCommand("replace", status.requested, minutes)}
         >
           Replace
         </button>
@@ -351,6 +363,25 @@
       </div>
     </div>
   {/if}
+
+  <!-- The countdown length a start asks for. Rendered from the shared
+       `MINUTES_CHOICES` so the offered buttons and the accepted values cannot
+       drift (`$lib/minutes.js`). It is a chooser, not a routine: the panel still
+       receives only the four button events. -->
+  <div class="minutes" role="group" aria-label="Timer length">
+    {#each MINUTES_CHOICES as choice (choice)}
+      <button
+        type="button"
+        class="minute"
+        class:selected={minutes === choice}
+        aria-pressed={minutes === choice}
+        disabled={disabled}
+        onclick={() => (minutes = choice)}
+      >
+        {choice} min
+      </button>
+    {/each}
+  </div>
 
   <ul class="controls">
     {#each routines as routine (routine.id)}
@@ -362,7 +393,7 @@
           disabled={disabled}
           class:in-flight={status.routine === routine.id && busy}
           class:confirmed={status.kind === "confirmed" && status.routine === routine.id}
-          onclick={() => sendCommand("start", routine.id)}
+          onclick={() => sendCommand("start", routine.id, minutes)}
         >
           <span class="art" aria-hidden="true">{routine.artwork}</span>
           <span class="label">{routine.label}</span>
@@ -551,6 +582,24 @@
   }
   .controls li {
     display: flex;
+  }
+
+  .minutes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-1);
+  }
+  .minute {
+    background: var(--c-surface);
+    color: var(--c-text);
+    border: 1px solid var(--c-muted);
+    font-weight: 600;
+    min-height: var(--tap-min);
+  }
+  .minute.selected {
+    background: var(--c-text);
+    color: var(--c-bg);
+    border-color: var(--c-text);
   }
 
   button {

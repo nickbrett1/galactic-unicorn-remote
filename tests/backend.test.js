@@ -361,6 +361,70 @@ describe("/api/start — conflict, offline, no-op, set", () => {
   });
 });
 
+describe("/api/start minutes — the remote-chosen countdown length (T6)", () => {
+  it("422s an out-of-range or non-integer length, setting nothing", async () => {
+    for (const minutes of [0, 2, 4, 6, -1, "3", 3.5, true]) {
+      const res = await post(postStart, { routine: "bathtime", minutes });
+      expect(res.status, `minutes=${String(minutes)}`).toBe(422);
+    }
+    expect(getDesired()).toBeNull();
+  });
+
+  it("defaults the length to 5 when the body omits it", async () => {
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+    const res = await post(postStart, { routine: "bathtime" });
+    expect(res.status).toBe(202);
+    expect((await res.json()).minutes).toBe(5);
+    expect(getDesired()).toMatchObject({ action: "start", minutes: 5 });
+  });
+
+  it("202s the chosen length, and the poll carries it to the board", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+
+    const res = await post(postStart, { routine: "bathtime", minutes: 3 });
+    expect(res.status).toBe(202);
+    expect((await res.json()).minutes).toBe(3);
+
+    const polled = await poll({
+      url: pollUrl({ boot: "b1", applied_gen: "0", state: "ambient" }),
+    });
+    expect(await polled.json()).toMatchObject({
+      action: "start",
+      routine: "bathtime",
+      minutes: 3,
+    });
+  });
+
+  it("carries the chosen length through a replace's cancel → start", async () => {
+    poll({
+      url: pollUrl({
+        boot: "b1",
+        applied_gen: "0",
+        state: "countdown",
+        routine: "bathtime",
+      }),
+    });
+
+    const replaceRes = await post(postReplace, {
+      routine: "booktime",
+      minutes: 1,
+    });
+    expect(replaceRes.status).toBe(202);
+
+    // Board applies the cancel and reports ambient; the start it then asks for
+    // must still name 1 minute, not fall back to the default.
+    const advance = await poll({
+      url: pollUrl({ boot: "b1", applied_gen: "2", state: "ambient" }),
+    });
+    expect(await advance.json()).toMatchObject({
+      action: "start",
+      routine: "booktime",
+      minutes: 1,
+    });
+  });
+});
+
 describe("/api/cancel — the D button", () => {
   it("202s while counting down", async () => {
     recordObserved(

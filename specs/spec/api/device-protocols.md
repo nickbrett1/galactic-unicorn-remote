@@ -96,9 +96,17 @@ unchanged **for free** (memo §3):
   at the panel. The child must not be able to tell the difference.
 
 **Scope follows from this.** The honest statement of v1 is: *the phone can press A, B, C and D.*
-Every capability the panel does not have — extending a countdown, editing durations — the remote
-cannot have either without inventing a new event. `+2 min` is deferred for exactly this reason: it
-needs a new `extend` event, not a button mimic (memo §12).
+Every capability the panel does not have the remote cannot have either without inventing a new event.
+`+2 min` is deferred for exactly this reason: it needs a new `extend` event, not a button mimic
+(memo §12).
+
+**One deliberate exception — the countdown length (T6).** A parent may choose **1, 3 or 5 minutes**
+for a *remote-started* countdown (default 5). This is not a fifth event: the length is **data riding
+alongside the `start`** the way `routine` already does, so the board's event vocabulary, the panel's
+child-proofing rules, `gen`, TTL and boot-id clearing are all untouched. It is fenced exactly like
+the idle banner (§3.0): bounded (three values), inert (it starts nothing the routine button would
+not), per-command and **never persisted**. A physical press sends no length at all and so keeps the
+routine's own `routines.json` `minutes` — byte-identical to the button it mimics.
 
 **This is why conflict handling lives on the server (§5 below).** The panel keeps its simple,
 child-proof rules and gains no notion of "a remote override". If the phone wants to replace a running
@@ -110,7 +118,7 @@ countdown, the *server* orchestrates cancel → wait → start.
 
 ```jsonc
 // the server holds (desired):
-{ "gen": 18, "action": "start", "routine": "bathtime", "expires_at": <server epoch> }
+{ "gen": 18, "action": "start", "routine": "bathtime", "minutes": 3, "expires_at": <server epoch> }
 
 // the board reports on every poll (observed):
 { "boot": "9f3c1a22", "fw": "0.2.0", "applied_gen": 18,
@@ -125,6 +133,11 @@ desired slot, and `message_id` is the board's acknowledgement of it — not a `g
 
 - **`gen` is a monotonic counter both sides agree on** (memo §5.1). The board persists `applied_gen`
   to flash (a few writes a day — wear is a non-issue) and **ignores anything `<= applied_gen`**.
+- **`minutes` is the remote-chosen countdown length — on a `start` only** (T6). One of `1 | 3 | 5`,
+  default `5`; data alongside the `start`, never a fifth event, so it moves no `gen` and is never
+  persisted. The board applies it to the countdown it starts; **absent (or invalid) falls back to the
+  routine's own `routines.json` `minutes`**, which is what a physical press does. The server always
+  sends an explicit integer — the board's fall-back exists only for an older server.
 - **No clock is involved on either side.** This keeps v1.5 §6's "the countdown must not depend on
   NTP" true by construction. There is no `expires_at` comparison on the board at all — the TTL is a
   **server-side** construct.

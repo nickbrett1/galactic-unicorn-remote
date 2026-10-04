@@ -447,6 +447,14 @@ components:
       type: string
       description: Routine id. `routines.json` is the single source of truth for ids and labels (memo §12).
       enum: [bathtime, booktime, cleanup]
+    Minutes:
+      type: integer
+      description: >
+        Countdown length in whole minutes: one of 1, 3 or 5. Optional on a start; absent means the
+        routine's own `routines.json` value. It rides *alongside* the start event the way `routine`
+        does — it adds no fifth device event, moves no `gen`, and is never persisted anywhere
+        (`device-protocols.md` §3).
+      enum: [1, 3, 5]
     DeviceEvent:
       type: string
       description: >
@@ -470,6 +478,8 @@ components:
       properties:
         routine:
           $ref: "#/components/schemas/RoutineId"
+        minutes:
+          $ref: "#/components/schemas/Minutes"
     Desired:
       type: object
       description: >
@@ -485,6 +495,8 @@ components:
           $ref: "#/components/schemas/DesiredAction"
         routine:
           $ref: "#/components/schemas/RoutineId"
+        minutes:
+          $ref: "#/components/schemas/Minutes"
         expires_at:
           type: integer
           description: >
@@ -584,6 +596,7 @@ components:
         gen: { type: integer, minimum: 0 }
         action: { $ref: "#/components/schemas/DesiredAction" }
         routine: { $ref: "#/components/schemas/RoutineId" }
+        minutes: { $ref: "#/components/schemas/Minutes" }
         expires_at: { type: integer }
         ttl_s: { type: integer }
     DevicePollResponse:
@@ -597,6 +610,7 @@ components:
         gen: { type: integer, minimum: 0 }
         action: { $ref: "#/components/schemas/DesiredAction" }
         routine: { $ref: "#/components/schemas/RoutineId" }
+        minutes: { $ref: "#/components/schemas/Minutes" }
         message:
           $ref: "#/components/schemas/Message"
         next_poll_ms:

@@ -16,8 +16,11 @@ memo §9, §9.1, §12; default conventions (WCAG 2.1 AA, semantic HTML, keyboard
 3. **Cancel is one big button.** Large target; it is the panicked button, and it maps exactly to `D`
    (memo §9).
 4. **A conflict affordance** rather than a silent switch (memo §5.5, §9).
-5. **No durations, no `+2 min`, no settings.** Those would be features the panel does not have
-   (memo §9).
+5. **No `+2 min`, no settings.** Those would be features the panel does not have (memo §9). The one
+   exception is the **countdown length** (T6): a 1/3/5-minute chooser (default 5) — *data alongside
+   the `start`*, not a new event, offered the same way the routine buttons are. It changes only how
+   long a remote-started countdown runs; it is not a setting, is not persisted, and a physical press
+   is unaffected (`device-protocols.md` §3).
 6. **The "sent vs done" rule is mandatory, not polish** — see §5.
 
 ## 2. Design tokens
@@ -134,7 +137,7 @@ heartbeat ~15 s) or the perceived liveness — the whole point of the UI — deg
 
 ## 8. What is deliberately absent
 
-Settings, durations, `+2 min`, history browsers, multi-panel selection, privilege tiers, admin
+Settings, `+2 min`, history browsers, multi-panel selection, privilege tiers, admin
 surfaces, theming, sound (the phone is silent by design — cancel stays silent on the panel, and the
 phone carries the acknowledgement, memo §11.13; a phone that beeped in a nursery would be its own
 bug).
