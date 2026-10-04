@@ -20,8 +20,36 @@ import {
   statusText,
   statusTone,
 } from "../src/lib/ui/command.js";
+import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
 
 const ROUTINES = catalogue.routines;
+
+describe("toPanelText — the composer accepts only what the panel can draw", () => {
+  it("folds a keyboard's typographic substitutions back to ASCII", () => {
+    expect(toPanelText("It\u2019s tea time")).toBe("It's tea time");
+    expect(toPanelText("\u201CReady\u201D")).toBe('"Ready"');
+    expect(toPanelText("Dinner \u2014 ready")).toBe("Dinner - ready");
+    expect(toPanelText("and\u2026")).toBe("and...");
+    expect(toPanelText("a\u00A0b")).toBe("a b");
+  });
+
+  it("drops what the LED font has no glyph for, and is idempotent", () => {
+    expect(toPanelText("Bedtime \u{1F984}")).toBe("Bedtime ");
+    expect(toPanelText("caf\u00E9")).toBe("caf");
+    expect(toPanelText("plain, ASCII!")).toBe("plain, ASCII!");
+    expect(toPanelText(toPanelText("It\u2019s \u{1F984}"))).toBe("It's ");
+    // Non-strings collapse to the empty string, never "undefined".
+    expect(toPanelText(undefined)).toBe("");
+    expect(toPanelText(null)).toBe("");
+  });
+
+  it("agrees with the server's printable-ASCII rule", () => {
+    expect(isPanelText("It's - plain")).toBe(true);
+    expect(isPanelText("It\u2019s")).toBe(false);
+    expect(isPanelText("emoji \u{1F984}")).toBe(false);
+    expect(isPanelText(toPanelText("It\u2019s \u{1F984}"))).toBe(true);
+  });
+});
 
 describe("formatLastSeen", () => {
   it("reads seconds under a minute and minutes above it", () => {
@@ -294,6 +322,27 @@ describe("command status — the sent-vs-done reducer", () => {
         routine: null,
       }),
     ).toEqual({ kind: "not_idle", state: "countdown" });
+  });
+
+  it("maps a 422 rejection to invalid, not a retryable error", () => {
+    const rejected = reduceStatus(initialStatus(), {
+      type: "response",
+      httpStatus: 422,
+      body: { error: "invalid_message" },
+      action: "message",
+      routine: null,
+    });
+    expect(rejected).toEqual({
+      kind: "invalid",
+      action: "message",
+      error: "invalid_message",
+    });
+    // The wording names the real cause; it must not invite a pointless retry.
+    expect(statusText(rejected)).toBe(
+      "the panel can only show plain text — no emoji or accents",
+    );
+    expect(statusText(rejected)).not.toContain("couldn't send");
+    expect(statusTone(rejected)).toBe("warn");
   });
 
   it("gives every status a word and a tone", () => {

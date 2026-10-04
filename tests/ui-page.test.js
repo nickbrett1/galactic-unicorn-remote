@@ -263,6 +263,53 @@ describe("D6 — the idle-only message composer", () => {
     expect(screen.queryByText("sending…")).toBeNull();
   });
 
+  it("folds a phone keyboard's curly apostrophe to ASCII before sending", async () => {
+    renderPage();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ id: 9, expires_at: future(), ttl_s: 120 }, 202),
+    );
+
+    const input = screen.getByLabelText("Message for the panel");
+    await act(async () => {
+      await fireEvent.input(input, { target: { value: "It\u2019s bedtime" } });
+    });
+    // The field itself never holds what the panel cannot draw.
+    expect(input.value).toBe("It's bedtime");
+
+    await click(screen.getByRole("button", { name: "Send" }));
+
+    const [, options] = fetchMock.mock.calls.at(-1);
+    // What the panel can draw — never the curly quote the phone produced.
+    expect(JSON.parse(options.body)).toEqual({ text: "It's bedtime" });
+  });
+
+  it("refuses to hold a character the panel has no glyph for", async () => {
+    renderPage();
+    const input = screen.getByLabelText("Message for the panel");
+    await act(async () => {
+      await fireEvent.input(input, { target: { value: "\u{1F984}" } });
+    });
+    // Dropped, and the field is emptied rather than left showing an emoji.
+    expect(input.value).toBe("");
+    expect(screen.getByRole("button", { name: "Send" }).disabled).toBe(true);
+  });
+
+  it("words a 422 rejection honestly, not as a retryable failure", async () => {
+    renderPage();
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "invalid_message" }, 422),
+    );
+
+    const input = screen.getByLabelText("Message for the panel");
+    await act(async () => {
+      await fireEvent.input(input, { target: { value: "whatever" } });
+    });
+    await click(screen.getByRole("button", { name: "Send" }));
+
+    expect(document.body.textContent).toContain("can only show plain text");
+    expect(document.body.textContent).not.toContain("couldn't send");
+  });
+
   it("reports a busy panel as 'not idle', not as a routine conflict", async () => {
     renderPage();
     fetchMock.mockResolvedValueOnce(

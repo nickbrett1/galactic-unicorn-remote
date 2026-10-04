@@ -20,8 +20,9 @@ import { formatLastSeen } from "./format.js";
 /** @typedef {{kind: 'not_idle', state: string|null}} NotIdle */
 /** @typedef {{kind: 'noop', action: string, reason: string}} Noop */
 /** @typedef {{kind: 'offline', lastSeenS: number|null}} Offline */
+/** @typedef {{kind: 'invalid', action: string, error: string|null}} Invalid */
 /** @typedef {{kind: 'error'}} ErrorState */
-/** @typedef {Idle|Pressing|Sending|Confirmed|Expired|Conflict|NotIdle|Noop|Offline|ErrorState} CommandStatus */
+/** @typedef {Idle|Pressing|Sending|Confirmed|Expired|Conflict|NotIdle|Noop|Offline|Invalid|ErrorState} CommandStatus */
 
 /** The banner action carries no `gen`; its confirmation is a reported message id. */
 const MESSAGE_ACTION = "message";
@@ -98,6 +99,13 @@ function onResponse({ httpStatus, body, action, routine }) {
   if (httpStatus === 503) {
     return { kind: "offline", lastSeenS: body?.last_seen_s ?? null };
   }
+  // 422 is a REJECTION, not a transport failure: the server refused the value
+  // itself (an idle banner it cannot draw, a body it could not read). Reporting
+  // it as "couldn't send — try again" would invite a retry that can never
+  // succeed, so it carries its own honest wording (memo §9.1, §10).
+  if (httpStatus === 422) {
+    return { kind: "invalid", action, error: body?.error ?? null };
+  }
   if (httpStatus === 200) {
     return { kind: "noop", action, reason: body?.reason ?? "noop" };
   }
@@ -173,6 +181,10 @@ export function statusText(status) {
       return `the panel didn't answer (last seen ${formatLastSeen(status.lastSeenS)})`;
     case "not_idle":
       return "the panel isn't idle — messages only show when it is";
+    case "invalid":
+      return status.action === MESSAGE_ACTION
+        ? "the panel can only show plain text — no emoji or accents"
+        : "that command wasn't accepted";
     case "offline":
       return `panel offline (last seen ${formatLastSeen(status.lastSeenS)})`;
     case "noop":
@@ -193,6 +205,7 @@ export function statusTone(status) {
     case "expired":
     case "conflict":
     case "not_idle":
+    case "invalid":
     case "noop":
       return "warn";
     case "confirmed":

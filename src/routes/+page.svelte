@@ -14,6 +14,7 @@
   import { onMount, untrack } from "svelte";
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
+  import { toPanelText } from "$lib/ui/panel-text.js";
   import WeatherIndicator from "$lib/ui/WeatherIndicator.svelte";
 
   let { data } = $props();
@@ -170,6 +171,7 @@
       status.kind === "confirmed" ||
       status.kind === "noop" ||
       status.kind === "not_idle" ||
+      status.kind === "invalid" ||
       status.kind === "error"
     ) {
       const timer = setTimeout(() => dispatch({ type: "reset" }), 2400);
@@ -397,7 +399,20 @@
         type="text"
         maxlength={messageMaxLen}
         placeholder="Message for the panel"
-        bind:value={messageText}
+        value={messageText}
+        oninput={(event) => {
+          // Accept only what the panel can draw (design-system.md §10.2): a
+          // phone keyboard's curly quotes and dashes are folded back to ASCII,
+          // and anything the LED font has no glyph for is dropped here, so the
+          // server never has to refuse a message that looked fine to type.
+          const clean = toPanelText(event.currentTarget.value);
+          // Write it back even when it matches the previous value: a dropped
+          // character (e.g. an emoji) leaves `messageText` unchanged, and
+          // without this the field would still show what it just refused.
+          if (clean !== event.currentTarget.value)
+            event.currentTarget.value = clean;
+          messageText = clean;
+        }}
       />
       <button
         type="submit"
