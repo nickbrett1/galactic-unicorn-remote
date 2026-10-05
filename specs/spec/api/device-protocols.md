@@ -100,12 +100,12 @@ Every capability the panel does not have the remote cannot have either without i
 `+2 min` is deferred for exactly this reason: it needs a new `extend` event, not a button mimic
 (memo §12).
 
-**One deliberate exception — the countdown length (T6).** A parent may choose **1, 3 or 5 minutes**
-for a *remote-started* countdown (default 5). This is not a fifth event: the length is **data riding
-alongside the `start`** the way `routine` already does, so the board's event vocabulary, the panel's
-child-proofing rules, `gen`, TTL and boot-id clearing are all untouched. It is fenced exactly like
-the idle banner (§3.0): bounded (three values), inert (it starts nothing the routine button would
-not), per-command and **never persisted**. A physical press sends no length at all and so keeps the
+**One deliberate exception — the countdown length (T6).** A parent may choose **1, 3, 5 or 10
+minutes** for a *remote-started* countdown (default 5). This is not a fifth event: the length is
+**data riding alongside the `start`** the way `routine` already does, so the board's event
+vocabulary, the panel's child-proofing rules, `gen`, TTL and boot-id clearing are all untouched. It
+is fenced exactly like the idle banner (§3.0): bounded (four values), inert (it starts nothing the
+routine button would not), per-command and **never persisted**. A physical press sends no length at all and so keeps the
 routine's own `routines.json` `minutes` — byte-identical to the button it mimics.
 
 **This is why conflict handling lives on the server (§5 below).** The panel keeps its simple,
@@ -133,8 +133,8 @@ desired slot, and `message_id` is the board's acknowledgement of it — not a `g
 
 - **`gen` is a monotonic counter both sides agree on** (memo §5.1). The board persists `applied_gen`
   to flash (a few writes a day — wear is a non-issue) and **ignores anything `<= applied_gen`**.
-- **`minutes` is the remote-chosen countdown length — on a `start` only** (T6). One of `1 | 3 | 5`,
-  default `5`; data alongside the `start`, never a fifth event, so it moves no `gen` and is never
+- **`minutes` is the remote-chosen countdown length — on a `start` only** (T6). One of
+  `1 | 3 | 5 | 10`, default `5`; data alongside the `start`, never a fifth event, so it moves no `gen` and is never
   persisted. The board applies it to the countdown it starts; **absent (or invalid) falls back to the
   routine's own `routines.json` `minutes`**, which is what a physical press does. The server always
   sends an explicit integer — the board's fall-back exists only for an older server.

@@ -99,7 +99,7 @@ Explicitly **not** built here (each also recorded in `spec/implementation-consid
    event, not a button mimic (memo §12).
 4. **Settings, privilege tiers, arbitrary duration editing** — the panel has no such feature, so the
    remote cannot either. This is what makes the Access identity-header trap inert (memo §8.3, §10).
-   One bounded exception is the **remote-chosen countdown length** (T6): 1/3/5 minutes, default 5,
+   One bounded exception is the **remote-chosen countdown length** (T6): 1/3/5/10 minutes, default 5,
    carried as data alongside the `start` — not a new event and not a persisted setting.
 5. **The phase-4 orchestrator** — the name `galactic-unicorn-remote` was chosen so the orchestrator
    name stays free (memo §7.1).

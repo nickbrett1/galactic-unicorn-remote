@@ -32,7 +32,7 @@ Sources: `memos/galactic-unicorn-remote-v1` (memo) and `memos/galactic-unicorn-r
 | `cloudflared` container, tunnel, Access application, hostname DNS | Phase A infrastructure on the NAS / Cloudflare, not code (memo §8.1, §13) |
 | NAS DHCP reservation / static IP | router/DSM change; a prerequisite, not a repo artifact (memo §11.12) |
 | `+2 min` / extend / settings / privilege tiers | would need a new `extend` event and a feature the panel does not have (memo §9, §12) |
-| The remote-chosen countdown length (1/3/5, default 5) | **in scope (T6)** — data alongside the `start`, not a new event (`device-protocols.md` §3) |
+| The remote-chosen countdown length (1/3/5/10, default 5) | **in scope (T6)** — data alongside the `start`, not a new event (`device-protocols.md` §3) |
 | MQTT / phase-3 ambient cards | no broker exists; phase 3 (memo §1) |
 | The phase-4 orchestrator | name deliberately kept free (memo §7.1) |
 | Editing the NAS's Homepage `services.yaml` | host config; the generated snippet is `deploy/homepage-services.yaml` |

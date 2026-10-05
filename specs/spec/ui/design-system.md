@@ -17,7 +17,7 @@ memo §9, §9.1, §12; default conventions (WCAG 2.1 AA, semantic HTML, keyboard
    (memo §9).
 4. **A conflict affordance** rather than a silent switch (memo §5.5, §9).
 5. **No `+2 min`, no settings.** Those would be features the panel does not have (memo §9). The one
-   exception is the **countdown length** (T6): a 1/3/5-minute chooser (default 5) — *data alongside
+   exception is the **countdown length** (T6): a 1/3/5/10-minute chooser (default 5) — *data alongside
    the `start`*, not a new event, offered the same way the routine buttons are. It changes only how
    long a remote-started countdown runs; it is not a setting, is not persisted, and a physical press
    is unaffected (`device-protocols.md` §3).

@@ -4,7 +4,7 @@
    *
    * Mobile-first and deliberately small: "a remote, not a control panel"
    * (`spec/ui/design-system.md`). Four controls (three routine buttons plus one
-   * Cancel), one countdown-length chooser (1/3/5 min, default 5 — T6), a live
+   * Cancel), one countdown-length chooser (1/3/5/10 min, default 5 — T6), a live
    * mirror, and the honest "sent vs done" states.
    *
    * All of the wiring lives in pure helpers (`$lib/ui/format.js`,
@@ -23,7 +23,7 @@
 
   const routines = $derived(data.snapshot.routines);
 
-  // The countdown length a start (or a replace) asks for: 1, 3 or 5 minutes,
+  // The countdown length a start (or a replace) asks for: 1, 3, 5 or 10 minutes,
   // default 5. It rides ALONGSIDE the routine event — the panel still only
   // ever gets the four button events; this is the length, not a fifth one.
   let minutes = $state(DEFAULT_MINUTES);
@@ -586,7 +586,7 @@
 
   .minutes {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: var(--space-1);
   }
   .minute {

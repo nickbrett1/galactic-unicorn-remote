@@ -77,7 +77,7 @@ function mapDoor(door) {
  * and no echoing of a rejected value (memo §10).
  *
  * `minutes` is optional (T6): absent means the routine's own default, and a
- * present value must be one of `MINUTES_CHOICES` (1, 3 or 5). The server always
+ * present value must be one of `MINUTES_CHOICES` (1, 3, 5 or 10). The server always
  * resolves it to an explicit integer so the board never has to guess — the
  * board's fall-back exists only for an older server.
  *

@@ -158,9 +158,9 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.queryByText(/\+2/)).toBeNull();
   });
 
-  it("offers the 1/3/5-minute countdown length, defaulting to 5", () => {
+  it("offers the 1/3/5/10-minute countdown length, defaulting to 5", () => {
     renderPage();
-    for (const minutes of [1, 3, 5]) {
+    for (const minutes of [1, 3, 5, 10]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }),
       ).toBeTruthy();
@@ -169,12 +169,11 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "5 min" }).ariaPressed).toBe(
       "true",
     );
-    expect(screen.getByRole("button", { name: "1 min" }).ariaPressed).toBe(
-      "false",
-    );
-    expect(screen.getByRole("button", { name: "3 min" }).ariaPressed).toBe(
-      "false",
-    );
+    for (const minutes of [1, 3, 10]) {
+      expect(
+        screen.getByRole("button", { name: `${minutes} min` }).ariaPressed,
+      ).toBe("false");
+    }
   });
 
   it("sends the chosen countdown length on a start", async () => {
