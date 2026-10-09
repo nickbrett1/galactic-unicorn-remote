@@ -176,6 +176,23 @@ describe("D1 — the shell and its controls", () => {
     }
   });
 
+  it("withholds a length the panel cannot honour, then reveals it once the panel updates", async () => {
+    // A board older than 0.1.51 would silently downgrade a 10-minute ask to its
+    // routine default, so the button is not offered at all (T6.1 stopgap).
+    renderPage({ panel: { fw: "0.1.50" } });
+    for (const minutes of [1, 3, 5]) {
+      expect(
+        screen.getByRole("button", { name: `${minutes} min` }),
+      ).toBeTruthy();
+    }
+    expect(screen.queryByRole("button", { name: "10 min" })).toBeNull();
+
+    // The panel updates itself: the same board now reports firmware that
+    // supports it, and the live mirror reveals the extra length.
+    await emitState({ fw: "0.1.51" });
+    expect(screen.getByRole("button", { name: "10 min" })).toBeTruthy();
+  });
+
   it("sends the chosen countdown length on a start", async () => {
     renderPage();
     fetchMock.mockResolvedValueOnce(

@@ -13,7 +13,8 @@
    * hard-codes a label or a path (`design-system.md` §2).
    */
   import { onMount, untrack } from "svelte";
-  import { DEFAULT_MINUTES, MINUTES_CHOICES } from "$lib/minutes.js";
+  import { DEFAULT_MINUTES } from "$lib/minutes.js";
+  import { availableMinutes } from "$lib/ui/firmware.js";
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
   import { toPanelText } from "$lib/ui/panel-text.js";
@@ -33,6 +34,19 @@
   let snapshot = $state(untrack(() => data.snapshot));
   let syncAt = $state(Date.now());
   let nowMs = $state(Date.now());
+
+  // The lengths the *connected panel* can honour (T6.1 stopgap). A board older
+  // than 0.1.51 would silently downgrade a 10-minute ask to its routine default,
+  // so never offer a length it cannot do — better no button than a lie. Unknown
+  // `fw` errs safe the same way; only a panel that reports >= 0.1.51 gets 10.
+  let offeredMinutes = $derived(availableMinutes(snapshot?.panel?.fw));
+
+  // Never leave the chooser on a length the panel dropped out from under it: if
+  // a stale selection is no longer offered (e.g. the panel reverted, or was
+  // swapped for an older one) fall back to the default.
+  $effect(() => {
+    if (!offeredMinutes.includes(minutes)) minutes = DEFAULT_MINUTES;
+  });
 
   // The command's life: sending… → confirmed, and confirmed ONLY from applied_gen.
   let status = $state(initialStatus());
@@ -364,12 +378,13 @@
     </div>
   {/if}
 
-  <!-- The countdown length a start asks for. Rendered from the shared
-       `MINUTES_CHOICES` so the offered buttons and the accepted values cannot
-       drift (`$lib/minutes.js`). It is a chooser, not a routine: the panel still
-       receives only the four button events. -->
+  <!-- The countdown length a start asks for. Rendered from `$lib/minutes.js`
+       narrowed by `$lib/ui/firmware.js` to what the connected panel can honour,
+       so the offered buttons and the accepted values cannot drift. It is a
+       chooser, not a routine: the panel still receives only the four button
+       events. -->
   <div class="minutes" role="group" aria-label="Timer length">
-    {#each MINUTES_CHOICES as choice (choice)}
+    {#each offeredMinutes as choice (choice)}
       <button
         type="button"
         class="minute"
@@ -586,7 +601,7 @@
 
   .minutes {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: var(--space-1);
   }
   .minute {

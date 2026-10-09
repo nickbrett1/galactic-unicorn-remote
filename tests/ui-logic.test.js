@@ -21,6 +21,12 @@ import {
   statusTone,
 } from "../src/lib/ui/command.js";
 import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
+import {
+  TEN_MINUTES_SINCE,
+  availableMinutes,
+  compareFirmware,
+} from "../src/lib/ui/firmware.js";
+import { MINUTES_CHOICES } from "../src/lib/minutes.js";
 
 const ROUTINES = catalogue.routines;
 
@@ -378,5 +384,39 @@ describe("command status — the sent-vs-done reducer", () => {
     expect(statusTone({ kind: "confirmed" })).toBe("go");
     expect(statusTone({ kind: "offline" })).toBe("danger");
     expect(statusTone({ kind: "idle" })).toBe("neutral");
+  });
+});
+
+describe("firmware — offer only the lengths the connected panel can honour", () => {
+  it("orders firmware versions by major.minor.patch", () => {
+    expect(compareFirmware("0.1.51", "0.1.50")).toBeGreaterThan(0);
+    expect(compareFirmware("0.1.50", "0.1.51")).toBeLessThan(0);
+    expect(compareFirmware("0.1.51", "0.1.51")).toBe(0);
+    expect(compareFirmware("0.2.0", "0.1.51")).toBeGreaterThan(0);
+    expect(compareFirmware("1.0.0", "0.9.9")).toBeGreaterThan(0);
+  });
+
+  it("sorts an absent or unparseable firmware below every real release", () => {
+    expect(compareFirmware(undefined, "0.1.0")).toBeLessThan(0);
+    expect(compareFirmware(null, "0.1.0")).toBeLessThan(0);
+    expect(compareFirmware("dev", "0.1.0")).toBeLessThan(0);
+  });
+
+  it("offers the full catalogue once a panel reports the 10-minute firmware", () => {
+    expect(availableMinutes(TEN_MINUTES_SINCE)).toEqual([...MINUTES_CHOICES]);
+    expect(availableMinutes("0.1.52")).toEqual([...MINUTES_CHOICES]);
+    expect(availableMinutes("1.0.0")).toEqual([...MINUTES_CHOICES]);
+  });
+
+  it("withholds 10 minutes from an older (or unknown) panel", () => {
+    expect(availableMinutes("0.1.50")).toEqual([1, 3, 5]);
+    expect(availableMinutes("0.1.0")).toEqual([1, 3, 5]);
+    expect(availableMinutes(undefined)).toEqual([1, 3, 5]);
+    expect(availableMinutes(null)).toEqual([1, 3, 5]);
+  });
+
+  it("always keeps the panel's own routine default (5) on offer", () => {
+    expect(availableMinutes("0.1.50")).toContain(5);
+    expect(availableMinutes(undefined)).toContain(5);
   });
 });
