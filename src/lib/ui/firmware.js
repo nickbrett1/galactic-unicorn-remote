@@ -4,13 +4,15 @@
  * The remote may offer a length (`$lib/minutes.js`) that the panel's firmware is
  * too old to understand. A pre-`0.1.51` board rejects `10` and silently falls
  * back to the routine's own `routines.json` minutes (the routine default, 5), so
- * offering the button made "select 10" start a 5-minute timer.
+ * offering the button made "select 10" start a 5-minute timer; a pre-`0.1.52`
+ * board does the same for `2`.
  *
- * Until every panel is on `0.1.51` (see NOTES T6.1 in the board repo), the remote
- * greys out any length the panel it is talking to cannot honour, so the UI never
- * offers a choice that would be quietly downgraded. The catalogue in
- * `$lib/minutes.js` stays the source of truth for what the *service* accepts;
- * this module only narrows it to what the *reported firmware* supports.
+ * Until every panel is on the firmware that honours a length (see NOTES T6.1 /
+ * T6.2 in the board repo), the remote greys out any length the panel it is
+ * talking to cannot honour, so the UI never offers a choice that would be quietly
+ * downgraded. The catalogue in `$lib/minutes.js` stays the source of truth for
+ * what the *service* accepts; this module only narrows it to what the *reported
+ * firmware* supports.
  *
  * Pure and DOM-free so it is unit-testable (`tests/ui-logic.test.js`).
  */
@@ -19,6 +21,19 @@ import { MINUTES_CHOICES } from "../minutes.js";
 
 /** The board firmware that first accepted a 10-minute countdown (board `0.1.51`). */
 export const TEN_MINUTES_SINCE = "0.1.51";
+
+/** The board firmware that first accepted a 2-minute countdown (board `0.1.52`). */
+export const TWO_MINUTES_SINCE = "0.1.52";
+
+/**
+ * The earliest firmware that honours each length the remote offers, for the
+ * lengths that were added after T6. A length with no entry here (1, 3, 5) is as
+ * old as the feature itself and every panel that can run it at all honours it.
+ */
+const MINUTES_SINCE = Object.freeze({
+  2: TWO_MINUTES_SINCE,
+  10: TEN_MINUTES_SINCE,
+});
 
 /**
  * Parse a `major.minor.patch` firmware string into numbers. Any non-numeric or
@@ -52,14 +67,17 @@ export function compareFirmware(a, b) {
 }
 
 /**
- * The countdown lengths a panel reporting `fw` can actually honour. A panel at
- * `TEN_MINUTES_SINCE` or newer supports the full `MINUTES_CHOICES`; an older (or
- * unknown) one supports all but `10`, matching its `lib/reconcile.py`.
+ * The countdown lengths a panel reporting `fw` can actually honour, so the UI
+ * offers exactly the set the connected board's `lib/reconcile.py` accepts. A
+ * panel too old to know a length would silently downgrade it to the routine's
+ * own minutes, so the button is withheld rather than offered as a lie.
  *
  * @param {string | null | undefined} fw the panel's reported firmware version
  * @returns {number[]}
  */
 export function availableMinutes(fw) {
-  if (compareFirmware(fw, TEN_MINUTES_SINCE) >= 0) return [...MINUTES_CHOICES];
-  return MINUTES_CHOICES.filter((minutes) => minutes < 10);
+  return MINUTES_CHOICES.filter((minutes) => {
+    const since = MINUTES_SINCE[minutes];
+    return since === undefined || compareFirmware(fw, since) >= 0;
+  });
 }

@@ -158,9 +158,9 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.queryByText(/\+2/)).toBeNull();
   });
 
-  it("offers the 1/3/5/10-minute countdown length, defaulting to 5", () => {
+  it("offers the 1/2/3/5/10-minute countdown length, defaulting to 5", () => {
     renderPage();
-    for (const minutes of [1, 3, 5, 10]) {
+    for (const minutes of [1, 2, 3, 5, 10]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }),
       ).toBeTruthy();
@@ -169,7 +169,7 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "5 min" }).ariaPressed).toBe(
       "true",
     );
-    for (const minutes of [1, 3, 10]) {
+    for (const minutes of [1, 2, 3, 10]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }).ariaPressed,
       ).toBe("false");
@@ -177,19 +177,27 @@ describe("D1 — the shell and its controls", () => {
   });
 
   it("withholds a length the panel cannot honour, then reveals it once the panel updates", async () => {
-    // A board older than 0.1.51 would silently downgrade a 10-minute ask to its
-    // routine default, so the button is not offered at all (T6.1 stopgap).
+    // A board older than 0.1.51 would silently downgrade a 10-minute ask (and,
+    // below 0.1.52, a 2-minute one) to its routine default, so the buttons are
+    // not offered at all (T6.1/T6.2 stopgap).
     renderPage({ panel: { fw: "0.1.50" } });
     for (const minutes of [1, 3, 5]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }),
       ).toBeTruthy();
     }
+    expect(screen.queryByRole("button", { name: "2 min" })).toBeNull();
     expect(screen.queryByRole("button", { name: "10 min" })).toBeNull();
 
-    // The panel updates itself: the same board now reports firmware that
-    // supports it, and the live mirror reveals the extra length.
+    // The panel steps up a release: a 0.1.51 board now honours 10, but a 2-minute
+    // ask is still one release away, so only 10 appears.
     await emitState({ fw: "0.1.51" });
+    expect(screen.getByRole("button", { name: "10 min" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "2 min" })).toBeNull();
+
+    // It steps up again: 0.1.52 honours both, and the live mirror reveals 2.
+    await emitState({ fw: "0.1.52" });
+    expect(screen.getByRole("button", { name: "2 min" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "10 min" })).toBeTruthy();
   });
 

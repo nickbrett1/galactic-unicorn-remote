@@ -4,7 +4,7 @@
    *
    * Mobile-first and deliberately small: "a remote, not a control panel"
    * (`spec/ui/design-system.md`). Four controls (three routine buttons plus one
-   * Cancel), one countdown-length chooser (1/3/5/10 min, default 5 — T6), a live
+   * Cancel), one countdown-length chooser (1/2/3/5/10 min, default 5 — T6), a live
    * mirror, and the honest "sent vs done" states.
    *
    * All of the wiring lives in pure helpers (`$lib/ui/format.js`,
@@ -24,8 +24,8 @@
 
   const routines = $derived(data.snapshot.routines);
 
-  // The countdown length a start (or a replace) asks for: 1, 3, 5 or 10 minutes,
-  // default 5. It rides ALONGSIDE the routine event — the panel still only
+  // The countdown length a start (or a replace) asks for: 1, 2, 3, 5 or 10
+  // minutes, default 5. It rides ALONGSIDE the routine event — the panel still only
   // ever gets the four button events; this is the length, not a fifth one.
   let minutes = $state(DEFAULT_MINUTES);
 
@@ -35,10 +35,11 @@
   let syncAt = $state(Date.now());
   let nowMs = $state(Date.now());
 
-  // The lengths the *connected panel* can honour (T6.1 stopgap). A board older
-  // than 0.1.51 would silently downgrade a 10-minute ask to its routine default,
-  // so never offer a length it cannot do — better no button than a lie. Unknown
-  // `fw` errs safe the same way; only a panel that reports >= 0.1.51 gets 10.
+  // The lengths the *connected panel* can honour (T6.1/T6.2 stopgap). A board
+  // older than 0.1.51 would silently downgrade a 10-minute ask to its routine
+  // default, and one older than 0.1.52 would do the same for 2 minutes, so never
+  // offer a length it cannot do — better no button than a lie. Unknown `fw` errs
+  // safe the same way; 10 needs >= 0.1.51 and 2 needs >= 0.1.52.
   let offeredMinutes = $derived(availableMinutes(snapshot?.panel?.fw));
 
   // Never leave the chooser on a length the panel dropped out from under it: if

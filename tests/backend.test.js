@@ -363,7 +363,7 @@ describe("/api/start — conflict, offline, no-op, set", () => {
 
 describe("/api/start minutes — the remote-chosen countdown length (T6)", () => {
   it("422s an out-of-range or non-integer length, setting nothing", async () => {
-    for (const minutes of [0, 2, 4, 6, -1, "3", 3.5, true]) {
+    for (const minutes of [0, 4, 6, 7, -1, "3", 3.5, true]) {
       const res = await post(postStart, { routine: "bathtime", minutes });
       expect(res.status, `minutes=${String(minutes)}`).toBe(422);
     }
@@ -393,6 +393,25 @@ describe("/api/start minutes — the remote-chosen countdown length (T6)", () =>
       action: "start",
       routine: "bathtime",
       minutes: 3,
+    });
+  });
+
+  it("accepts 2 minutes as a choice", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+
+    const res = await post(postStart, { routine: "bathtime", minutes: 2 });
+    expect(res.status).toBe(202);
+    expect((await res.json()).minutes).toBe(2);
+    expect(getDesired()).toMatchObject({ action: "start", minutes: 2 });
+
+    const polled = await poll({
+      url: pollUrl({ boot: "b1", applied_gen: "0", state: "ambient" }),
+    });
+    expect(await polled.json()).toMatchObject({
+      action: "start",
+      routine: "bathtime",
+      minutes: 2,
     });
   });
 
