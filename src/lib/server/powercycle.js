@@ -263,6 +263,15 @@ const mon = {
   quietSinceS: null,
   cycles: 0,
   lastCycleAtS: null,
+  /**
+   * Whether we have already said, for THIS wedge, that the cycle budget is spent
+   * and the panel is still away. The monitor keeps ticking (cheaply) but stops
+   * cycling; without this the service would simply go quiet after the last
+   * attempt and a stuck panel would sit offline with no record that its
+   * automatic recovery had given up (2026-10-12: 8 h offline, budget spent,
+   * nothing said). Once is enough — the edge, not a heartbeat.
+   */
+  escalated: false,
   timer: null,
 };
 
@@ -286,6 +295,7 @@ export async function tick() {
       mon.quietSinceS = null;
       mon.cycles = 0;
       mon.lastCycleAtS = null;
+      mon.escalated = false;
     }
     mon.wasOnline = true;
     return { action: "none", reason: "online" };
@@ -296,6 +306,7 @@ export async function tick() {
     mon.quietSinceS = nowS;
     mon.cycles = 0;
     mon.lastCycleAtS = null;
+    mon.escalated = false;
     note("wedge", `panel went quiet (no poll for ${live.last_seen_s}s)`);
   }
 
@@ -310,7 +321,27 @@ export async function tick() {
     cooldownS: config.powerCycleCooldownS,
   });
 
-  if (decision.action !== "cycle") return decision;
+  if (decision.action !== "cycle") {
+    // The one gap that matters: once the per-wedge budget is spent we stop
+    // cycling (deliberately — see the module header), but we must not stop
+    // SAYING so. Record the give-up edge once, so "the panel is offline" has a
+    // cause on the record and the operator knows manual intervention is needed
+    // rather than waiting for a recovery that can no longer happen.
+    if (decision.reason === "cycle-budget-spent" && !mon.escalated) {
+      mon.escalated = true;
+      const quiet = nowS - mon.quietSinceS;
+      note(
+        "wedge",
+        `panel unrecovered after ${quiet}s quiet; power-cycle budget spent ` +
+          `(${mon.cycles}/${config.powerCycleMax}) — manual intervention needed`,
+      );
+      console.warn(
+        `[powercycle] panel unrecovered after ${quiet}s quiet; power-cycle ` +
+          `budget spent (${mon.cycles}/${config.powerCycleMax}) — manual intervention needed`,
+      );
+    }
+    return decision;
+  }
 
   mon.cycles += 1;
   mon.lastCycleAtS = nowS;
@@ -368,4 +399,5 @@ export function stopPowerCycleMonitor() {
   mon.quietSinceS = null;
   mon.cycles = 0;
   mon.lastCycleAtS = null;
+  mon.escalated = false;
 }
