@@ -552,6 +552,30 @@ describe("D3 — SSE stream and the polling fallback", () => {
     expect(document.body.textContent).toContain("1:40");
   });
 
+  it("keeps the mirror live from the poll while the stream is open but silent", async () => {
+    // An open `EventSource` is not proof the stream is flowing: a buffering
+    // proxy or a stalled tunnel holds it open and delivers nothing, and
+    // `onerror` never fires. Trusting `onopen` alone froze the mirror, so a
+    // healthy panel drifted past the offline threshold and read as "offline".
+    // The poll must therefore run from the first moment, until a frame proves
+    // the stream is real.
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        makeSnapshot({
+          state: "countdown",
+          routine: "cleanup",
+          remaining_s: 60,
+        }),
+        200,
+      ),
+    );
+    renderPage();
+    await flushAsync();
+    expect(fetchMock).toHaveBeenCalledWith("/api/state");
+    // No `state` frame was ever emitted, yet the mirror follows the poll.
+    expect(document.body.textContent).toContain("Cleanup");
+  });
+
   it("falls back to a 2 s /api/state poll when the stream errors", async () => {
     renderPage();
     fetchMock.mockResolvedValue(

@@ -24,6 +24,11 @@
 
   let { data } = $props();
 
+  // How long the SSE stream may go silent before the 2 s `/api/state` poll takes
+  // over. While this page is a live subscriber the board polls every ~2 s, so a
+  // stream that has delivered nothing for several seconds is stalled, not idle.
+  const STALE_STREAM_MS = 6000;
+
   const routines = $derived(data.snapshot.routines);
 
   // The countdown length a start (or a replace) asks for: 1, 2, 3, 5 or 10
@@ -233,6 +238,17 @@
 
     let source = null;
     let poll = null;
+    let watchdog = null;
+
+    // When the EVENT STREAM last actually painted a frame (0 = none yet). An
+    // open `EventSource` is NOT proof the stream is flowing: a buffering proxy
+    // or a stalled tunnel (Cloudflare) holds the connection open and sends
+    // nothing, and `onerror` may never fire. Stopping the poll on `onopen` —
+    // as this used to — meant that a silent-but-open stream froze the mirror,
+    // so a perfectly healthy panel drifted past the offline threshold and read
+    // as "offline". Prove the stream is live before trusting it, and take it
+    // back when it goes quiet again.
+    let lastFrameAt = 0;
 
     function startPolling() {
       if (poll) return;
@@ -259,20 +275,33 @@
       source.addEventListener("state", (event) => {
         try {
           applySnapshot(JSON.parse(event.data).state);
+          lastFrameAt = Date.now();
         } catch {
           // A malformed frame is ignored, never fatal.
         }
       });
       // Unknown frame names are ignored, not errored (forward compatibility).
       source.addEventListener("audit", () => {});
-      source.onopen = () => stopPolling();
       source.onerror = () => startPolling();
+      // Poll from the first moment: until the stream delivers a frame, the poll
+      // IS the source of truth. While a subscriber (this page) is connected the
+      // board polls every ~2 s, so a silence longer than a few seconds is a
+      // stall, not a healthy quiet.
+      startPolling();
+      watchdog = setInterval(() => {
+        if (lastFrameAt && Date.now() - lastFrameAt <= STALE_STREAM_MS) {
+          stopPolling();
+        } else {
+          startPolling();
+        }
+      }, STALE_STREAM_MS);
     } else {
       startPolling();
     }
 
     return () => {
       clearInterval(clock);
+      if (watchdog) clearInterval(watchdog);
       stopPolling();
       source?.close();
     };
