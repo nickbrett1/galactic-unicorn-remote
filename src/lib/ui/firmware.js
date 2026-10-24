@@ -85,15 +85,15 @@ export function availableMinutes(fw) {
 /*
  * The same honesty rule, one step further: a routine the panel's firmware
  * cannot know. `shoes` is remote-only (the panel has A/B/C plus D for cancel),
- * and a board older than 0.1.54 has `ROUTINE_IDS` without it — its
+ * and a board older than 0.1.55 has `ROUTINE_IDS` without it — its
  * `reconcile.event_for_desired` drops the start without a word while the poll
  * still reports "applied", so the button would promise a timer that never
  * starts. Withhold it rather than offer a lie, exactly as `availableMinutes`
  * does for a length.
  */
 
-/** The board firmware that first knows the remote-only `shoes` routine (board `0.1.54`). */
-export const SHOES_SINCE = "0.1.54";
+/** The board firmware that first knows the remote-only `shoes` routine (board `0.1.55`). */
+export const SHOES_SINCE = "0.1.55";
 
 /** The earliest firmware that knows each routine added after the original three. */
 const ROUTINE_SINCE = Object.freeze({

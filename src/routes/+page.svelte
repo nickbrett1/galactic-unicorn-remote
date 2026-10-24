@@ -38,7 +38,7 @@
   let nowMs = $state(Date.now());
 
   // The routine buttons the *connected panel* can start. The remote-only
-  // routine landed in board 0.1.54; a board older than that drops the start
+  // routine landed in board 0.1.55; a board older than that drops the start
   // without a word, so the button is withheld rather than offered as a lie
   // (the same rule `offeredMinutes` applies to a length).
   let offeredRoutines = $derived(

@@ -159,9 +159,9 @@ describe("D1 — the shell and its controls", () => {
   });
 
   it("withholds Shoes On from a panel whose firmware cannot start it", () => {
-    // 0.1.53 is the last board before the routine existed: it would drop the
+    // 0.1.54 is the last board before the routine existed: it would drop the
     // start silently, so no button rather than a lie.
-    renderPage({ panel: { fw: "0.1.53" } });
+    renderPage({ panel: { fw: "0.1.54" } });
     expect(screen.queryByRole("button", { name: "Shoes On" })).toBeNull();
     for (const routine of ROUTINES.filter((r) => r.id !== "shoes")) {
       expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
@@ -169,7 +169,7 @@ describe("D1 — the shell and its controls", () => {
   });
 
   it("offers Shoes On once the panel reports firmware that knows it", () => {
-    renderPage({ panel: { fw: "0.1.54" } });
+    renderPage({ panel: { fw: "0.1.55" } });
     expect(screen.getByRole("button", { name: "Shoes On" })).toBeTruthy();
   });
 

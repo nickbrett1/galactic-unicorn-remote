@@ -433,7 +433,7 @@ describe("firmware — offer only the lengths the connected panel can honour", (
 
 describe("firmware — offer only the routines the connected panel can start", () => {
   it("withholds Shoes On from a panel older than the routine", () => {
-    expect(availableRoutines(ROUTINES, "0.1.53").map((r) => r.id)).toEqual([
+    expect(availableRoutines(ROUTINES, "0.1.54").map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
       "cleanup",
