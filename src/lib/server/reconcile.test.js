@@ -318,22 +318,24 @@ describe("nextPollMs — demand-driven cadence", () => {
 });
 
 describe("event-vocabulary guard — the remote mimics the buttons and nothing else", () => {
-  it("has exactly the three routine ids", () => {
+  it("has exactly the expected routine ids", () => {
     expect([...ROUTINE_IDS].sort()).toEqual([
       "bathtime",
       "booktime",
       "cleanup",
+      "shoes",
     ]);
   });
 
-  it("has exactly four device events: the three routes plus reset", () => {
+  it("has one device event per routine, plus reset", () => {
     expect([...DEVICE_EVENTS]).toEqual([
       "bathtime",
       "booktime",
       "cleanup",
+      "shoes",
       "reset",
     ]);
-    expect(DEVICE_EVENTS).toHaveLength(4);
+    expect(DEVICE_EVENTS).toHaveLength(5);
   });
 
   it("maps a cancel to the reset (D) event and nothing else", () => {

@@ -22,9 +22,11 @@ import {
 } from "../src/lib/ui/command.js";
 import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
 import {
+  SHOES_SINCE,
   TEN_MINUTES_SINCE,
   TWO_MINUTES_SINCE,
   availableMinutes,
+  availableRoutines,
   compareFirmware,
 } from "../src/lib/ui/firmware.js";
 import { MINUTES_CHOICES } from "../src/lib/minutes.js";
@@ -426,5 +428,30 @@ describe("firmware — offer only the lengths the connected panel can honour", (
   it("always keeps the panel's own routine default (5) on offer", () => {
     expect(availableMinutes("0.1.50")).toContain(5);
     expect(availableMinutes(undefined)).toContain(5);
+  });
+});
+
+describe("firmware — offer only the routines the connected panel can start", () => {
+  it("withholds Shoes On from a panel older than the routine", () => {
+    expect(availableRoutines(ROUTINES, "0.1.53").map((r) => r.id)).toEqual([
+      "bathtime",
+      "booktime",
+      "cleanup",
+    ]);
+    expect(availableRoutines(ROUTINES, undefined).map((r) => r.id)).toEqual([
+      "bathtime",
+      "booktime",
+      "cleanup",
+    ]);
+  });
+
+  it("offers every routine once the panel reports the Shoes On firmware", () => {
+    expect(availableRoutines(ROUTINES, SHOES_SINCE).map((r) => r.id)).toEqual([
+      "bathtime",
+      "booktime",
+      "cleanup",
+      "shoes",
+    ]);
+    expect(availableRoutines(ROUTINES, "1.0.0")).toHaveLength(4);
   });
 });

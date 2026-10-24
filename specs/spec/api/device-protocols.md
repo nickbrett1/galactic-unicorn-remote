@@ -20,7 +20,7 @@ GET /device/poll
       &fw=<firmware version>
       &applied_gen=<n>
       &state=<ambient|prompt|countdown|handoff>
-      &routine=<bathtime|booktime|cleanup>   # only in countdown/handoff
+      &routine=<bathtime|booktime|cleanup|shoes>   # only in countdown/handoff
       &remaining_s=<n>                       # only in countdown/handoff
       &rssi=<dBm>
       &uptime_s=<n>
@@ -65,16 +65,23 @@ The server's machine-readable view of this endpoint is
 
 ---
 
-## 2. The four events — the whole of the remote's vocabulary
+## 2. The device events — the whole of the remote's vocabulary
 
-`lib/remote.py` produces **exactly four events**, and nothing else (memo §3):
+`lib/remote.py` produces **one event per routine, plus `reset`** — and nothing else (memo §3):
 
 | Event | Physical equivalent | Panel behaviour |
 |---|---|---|
 | `bathtime` | ROUTINE button A | starts the bathtime lead-in countdown |
 | `booktime` | ROUTINE button B | starts the booktime lead-in countdown |
 | `cleanup` | ROUTINE button C | starts the cleanup lead-in countdown |
+| `shoes` | **none — remote-only** | starts the Shoes On lead-in countdown |
 | `reset` | **D** | cancels, in PROMPT, COUNTDOWN and HANDOFF |
+
+`shoes` is the one routine with no button: the panel has three routine caps and D cancels, so the
+phone is the only place it can be started. It is still an ordinary routine event — same PROMPT, same
+countdown, same payloads — and the board ships it in `routines.json`. A panel whose firmware predates
+the routine (board `< 0.1.54`) drops the start, so the remote withholds the button rather than offer a
+timer that never starts (`ui/firmware.js`, `availableRoutines`).
 
 The remote is **not a feature** — it is a second producer of the button events the state machine
 already handles (memo §0, §3):
@@ -95,7 +102,8 @@ unchanged **for free** (memo §3):
 - PROMPT plays the routine's tune, so a **phone-triggered countdown sounds identical** to one started
   at the panel. The child must not be able to tell the difference.
 
-**Scope follows from this.** The honest statement of v1 is: *the phone can press A, B, C and D.*
+**Scope follows from this.** The honest statement of v1 is: *the phone can press A, B, C and D, plus
+start the remote-only Shoes On timer.*
 Every capability the panel does not have the remote cannot have either without inventing a new event.
 `+2 min` is deferred for exactly this reason: it needs a new `extend` event, not a button mimic
 (memo §12).

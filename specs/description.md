@@ -17,14 +17,14 @@ refers to `memos/galactic-unicorn-remote-stack`.
 
 ## 1. Goals and Overview
 
-Start and cancel the three household countdowns — **bathtime / booktime / cleanup** — from a phone,
-with the physical panel (a Pimoroni Galactic Unicorn) behaving *exactly* as it does today, and give a
+Start and cancel the household countdowns — **bathtime / booktime / cleanup**, plus the remote-only
+**Shoes On** — from a phone, with the physical panel (a Pimoroni Galactic Unicorn) behaving *exactly* as it does today, and give a
 second phone that is **not** on Tailscale the same ability through a Cloudflare Tunnel gated on her
 email address (memo Goal).
 
 The panel is a toddler-facing display that already runs three countdowns off four physical buttons.
-The remote adds **no new panel behaviour**: it is a *second producer of the four button events*
-(`bathtime`, `booktime`, `cleanup`, `reset`) that the existing state machine already handles
+The remote adds **no new panel behaviour**: it is a *second producer of the button events*
+(`bathtime`, `booktime`, `cleanup`, `shoes`, `reset`) that the existing state machine already handles
 (memo §3). Remote cancel *is* the `D` button. Consequently the panel works identically with this
 service **dead** — the failure mode is "the phone didn't work", never "the display broke" (memo §2).
 
@@ -122,7 +122,7 @@ These are hard constraints for later phases. Each is settled in a memo; none is 
 | # | Decision | Source |
 |---|---|---|
 | AD-1 | **The panel stays the only timer.** The server holds a mirror, never a clock. `remaining_s` comes from the board's report; the browser interpolates and re-syncs. | memo §0, §5.3 |
-| AD-2 | **The remote is a second producer of button events**, not a new code path. Exactly four events: `bathtime`, `booktime`, `cleanup`, `reset`. Scope = start + cancel only; the one addition is the countdown length (T6), data alongside a `start`, not a fifth event. | memo §0, §3 |
+| AD-2 | **The remote is a second producer of button events**, not a new code path. One event per routine plus `reset`: `bathtime`, `booktime`, `cleanup`, `shoes`, `reset`. `shoes` has no physical button, so it is the one event the phone alone can produce. Scope = start + cancel only; the one addition is the countdown length (T6), data alongside a `start`, not another event. | memo §0, §3 |
 | AD-3 | **The board polls the NAS over plain HTTP** (~2 s active / ~5 s idle). Not MQTT, not an inbound listener. | memo §0, §4 |
 | AD-4 | **Every connection is outbound; nothing ever dials the board.** The board dials the NAS; the NAS dials Cloudflare. | memo §2, §4 |
 | AD-5 | **Server holds desired state with a monotonic `gen`; the device reconciles and reports `applied_gen`.** No clock on either side; `applied_gen` persisted to flash on the device. | memo §5.1 |
@@ -164,7 +164,7 @@ spec/
 │   ├── command-round-trip-sequence.md      # press → desired → poll → applied_gen → confirmed
 │   ├── replace-conflict-sequence.md        # cancel → wait ambient → start, never a silent switch
 │   ├── door-routing-sequence.md            # tunnel vs tailnet vs LAN-only surfaces
-│   ├── device-desired-state-state-machine.md  # the four events × panel state
+│   ├── device-desired-state-state-machine.md  # the device events × panel state
 │   └── panel-lifecycle-state-machine.md    # boot / online / offline / new-boot-id
 ├── ui/
 │   ├── design-system.md              # tokens, the four controls, the sent/done rule, a11y
@@ -172,7 +172,7 @@ spec/
 │       └── remote-ui.excalidraw      # low-fidelity phone wireframes (import at excalidraw.com)
 ├── capacity/
 │   └── load-model.md                 # 1 device, 2 users, poll rates, retention
-├── event-flow.md                     # event/SSE schemas + the four device events
+├── event-flow.md                     # event/SSE schemas + the device events
 ├── implementation-considerations.md  # the constraint ledger (§1..§N)
 └── docs/adr/
     ├── 0001-buildkite-not-circleci.md

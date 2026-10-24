@@ -3,9 +3,11 @@
    * The remote — D1/D2/D3.
    *
    * Mobile-first and deliberately small: "a remote, not a control panel"
-   * (`spec/ui/design-system.md`). Four controls (three routine buttons plus one
-   * Cancel), one countdown-length chooser (1/2/3/5/10 min, default 5 — T6), a live
-   * mirror, and the honest "sent vs done" states.
+   * (`spec/ui/design-system.md`). One button per routine (three on the panel's
+   * own buttons, plus the remote-only one) and one Cancel, one
+   * countdown-length chooser (1/2/3/5/10 min, default 5 — T6), a live mirror,
+   * and the honest "sent vs done" states. A routine or a length the connected
+   * panel's firmware cannot honour is withheld, never offered as a lie.
    *
    * All of the wiring lives in pure helpers (`$lib/ui/format.js`,
    * `$lib/ui/command.js`) so the one hard UX rule is unit-testable. Routine ids,
@@ -14,7 +16,7 @@
    */
   import { onMount, untrack } from "svelte";
   import { DEFAULT_MINUTES } from "$lib/minutes.js";
-  import { availableMinutes } from "$lib/ui/firmware.js";
+  import { availableMinutes, availableRoutines } from "$lib/ui/firmware.js";
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
   import { toPanelText } from "$lib/ui/panel-text.js";
@@ -34,6 +36,14 @@
   let snapshot = $state(untrack(() => data.snapshot));
   let syncAt = $state(Date.now());
   let nowMs = $state(Date.now());
+
+  // The routine buttons the *connected panel* can start. The remote-only
+  // routine landed in board 0.1.54; a board older than that drops the start
+  // without a word, so the button is withheld rather than offered as a lie
+  // (the same rule `offeredMinutes` applies to a length).
+  let offeredRoutines = $derived(
+    availableRoutines(routines, snapshot?.panel?.fw),
+  );
 
   // The lengths the *connected panel* can honour (T6.1/T6.2 stopgap). A board
   // older than 0.1.51 would silently downgrade a 10-minute ask to its routine
@@ -400,7 +410,7 @@
   </div>
 
   <ul class="controls">
-    {#each routines as routine (routine.id)}
+    {#each offeredRoutines as routine (routine.id)}
       <li>
         <button
           type="button"

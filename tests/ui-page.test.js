@@ -148,7 +148,7 @@ afterEach(() => {
 });
 
 describe("D1 — the shell and its controls", () => {
-  it("renders three routine buttons and one Cancel, labelled from routines.json", () => {
+  it("renders one routine button per routine and one Cancel, labelled from routines.json", () => {
     renderPage();
     for (const routine of ROUTINES) {
       expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
@@ -156,6 +156,21 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
     // No +2 min, no settings. The one chooser is the countdown length (§5, T6).
     expect(screen.queryByText(/\+2/)).toBeNull();
+  });
+
+  it("withholds Shoes On from a panel whose firmware cannot start it", () => {
+    // 0.1.53 is the last board before the routine existed: it would drop the
+    // start silently, so no button rather than a lie.
+    renderPage({ panel: { fw: "0.1.53" } });
+    expect(screen.queryByRole("button", { name: "Shoes On" })).toBeNull();
+    for (const routine of ROUTINES.filter((r) => r.id !== "shoes")) {
+      expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
+    }
+  });
+
+  it("offers Shoes On once the panel reports firmware that knows it", () => {
+    renderPage({ panel: { fw: "0.1.54" } });
+    expect(screen.getByRole("button", { name: "Shoes On" })).toBeTruthy();
   });
 
   it("offers the 1/2/3/5/10-minute countdown length, defaulting to 5", () => {

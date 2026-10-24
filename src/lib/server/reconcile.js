@@ -18,7 +18,7 @@
 
 import { ROUTINE_IDS } from "./routines.js";
 
-/** The four device events the remote can produce — three routines plus `reset` (D). */
+/** The device events the remote can produce — the routines plus `reset` (D). */
 export const DEVICE_EVENTS = Object.freeze([...ROUTINE_IDS, "reset"]);
 
 /** The panel's own states, as REPORTED BY THE BOARD. The server never invents them. */

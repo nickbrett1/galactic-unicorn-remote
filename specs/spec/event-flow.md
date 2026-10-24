@@ -4,18 +4,18 @@ Two families of "event" exist in this project, and they must not be conflated:
 
 | Family | Where | Cardinality | Defined by |
 |---|---|---|---|
-| **Device events** | inside the firmware's state machine | exactly **4** | memo §3; shared vocabulary, but produced by the board |
+| **Device events** | inside the firmware's state machine | one per routine + `reset` (**5**) | memo §3; shared vocabulary, but produced by the board |
 | **Wire/UI events** | `GET /api/events` (SSE) | a closed set of frame types | this repo |
 
 There is no message bus, no queue and no event broker anywhere in the design (memo §5.2).
 
 ---
 
-## 1. The four device events (the remote's entire vocabulary)
+## 1. The device events (the remote's entire vocabulary)
 
-`lib/remote.py` produces **exactly four events** — `bathtime`, `booktime`, `cleanup`, `reset` — and
-nothing else. This is the whole of v1's scope: *"start a timer and cancel only — just mimic the
-buttons"* (memo §3). They are **not** events on the wire as such: the board carries them as the
+`lib/remote.py` produces **one event per routine, plus `reset`** — `bathtime`, `booktime`, `cleanup`,
+`shoes`, `reset` — and nothing else. This is the whole of v1's scope: *"start a timer and cancel only
+— just mimic the buttons"* (memo §3), with `shoes` the one routine the panel has no button for. They are **not** events on the wire as such: the board carries them as the
 `action` + `routine` of a desired-state application, and as the panel state it reports back.
 
 ```jsonc
@@ -23,6 +23,7 @@ buttons"* (memo §3). They are **not** events on the wire as such: the board car
 { "gen": 18, "action": "start",  "routine": "bathtime" }   // => device event `bathtime` (button A)
 { "gen": 18, "action": "start",  "routine": "booktime" }   // => device event `booktime`  (button B)
 { "gen": 18, "action": "start",  "routine": "cleanup"  }   // => device event `cleanup`   (button C)
+{ "gen": 18, "action": "start",  "routine": "shoes"    }   // => device event `shoes`     (no button)
 { "gen": 19, "action": "cancel" }                          // => device event `reset`     (button D)
 ```
 
@@ -31,16 +32,17 @@ buttons"* (memo §3). They are **not** events on the wire as such: the board car
 | `bathtime` | A | start the bathtime lead-in countdown | PROMPT plays the routine's tune; identical to a physical press (memo §3) |
 | `booktime` | B | start the booktime lead-in countdown | as above |
 | `cleanup` | C | start the cleanup lead-in countdown | as above; id `cleanup`, label "Cleanup" on both surfaces (memo §12) |
+| `shoes` | **none** | start the Shoes On lead-in countdown | remote-only: the panel has A/B/C and D cancels, so only the phone can start it |
 | `reset` | **D** | cancel | live in PROMPT, COUNTDOWN and HANDOFF; silent; a no-op in AMBIENT |
 
 **Invariants:**
 
-1. ROUTINE events (`bathtime`/`booktime`/`cleanup`) are **inert during COUNTDOWN**. A remote
+1. ROUTINE events (`bathtime`/`booktime`/`cleanup`/`shoes`) are **inert during COUNTDOWN**. A remote
    "book time" while bathtime runs does nothing on the panel — no silent switch, no lost countdown.
 2. `reset` is live in **every active state** (PROMPT, COUNTDOWN, HANDOFF).
 3. `reset` stays **silent** — a remote cancel must not play a tune; the phone carries the
    acknowledgement instead (memo §3, §11.13).
-4. **No fifth event exists, and inventing one is out of scope.** `+2 min` would need an `extend`
+4. **No event exists beyond one per routine plus `reset`, and inventing one is out of scope.** `+2 min` would need an `extend`
    event, which is exactly why it is deferred (memo §12). The idle scrolling banner (`ui/design-system.md`
    §10) is deliberately **not** an exception: it is idle-screen *content* written to
    and echoed from a slot of its own, not a device event — see §2 below.
@@ -107,7 +109,7 @@ X-Accel-Buffering: no
 
 ```text
 event: state
-data: {"type":"state","state":{"panel":{"boot":"9f3c1a22","fw":"0.2.0","applied_gen":18,"state":"countdown","routine":"bathtime","remaining_s":214,"online":true,"last_seen_s":2},"desired":{"gen":18,"action":"start","routine":"bathtime","expires_at":1758720045},"routines":[{"id":"bathtime","label":"Bathtime","symbol":"duck"},{"id":"booktime","label":"Booktime","symbol":"book"},{"id":"cleanup","label":"Cleanup","symbol":"toy-box"}],"door":{"kind":"tunnel","email":"ts.akhtar@gmail.com"}}}
+data: {"type":"state","state":{"panel":{"boot":"9f3c1a22","fw":"0.2.0","applied_gen":18,"state":"countdown","routine":"bathtime","remaining_s":214,"online":true,"last_seen_s":2},"desired":{"gen":18,"action":"start","routine":"bathtime","expires_at":1758720045},"routines":[{"id":"bathtime","label":"Bathtime","symbol":"duck"},{"id":"booktime","label":"Booktime","symbol":"book"},{"id":"cleanup","label":"Cleanup","symbol":"toy-box"},{"id":"shoes","label":"Shoes On","symbol":"shoe"}],"door":{"kind":"tunnel","email":"ts.akhtar@gmail.com"}}}
 
 event: audit
 data: {"type":"audit","seq":41,"at":"2026-09-24T14:20:03Z","action":"start","routine":"bathtime","outcome":"applied"}

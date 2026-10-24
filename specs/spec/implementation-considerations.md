@@ -16,7 +16,7 @@ Sources: `memos/galactic-unicorn-remote-v1` (memo) and `memos/galactic-unicorn-r
 - The SvelteKit 5 / Node (`adapter-node`) program: the UI (`src/routes/+page.svelte`) and the API
   (`+server.js` endpoints) — one program, one language (stack-memo §1, §2).
 - The **shared HTTP contract** the board must honour: paths, query params, JSON request/response
-  shapes, `gen`, `applied_gen`, `next_poll_ms`, the ~45 s TTL, the four events, `/health` and
+  shapes, `gen`, `applied_gen`, `next_poll_ms`, the ~45 s TTL, the device events, `/health` and
   `/device/poll` (memo §5.1, §6.1, §7.2).
 - The server-side reconcile logic (TTL, `gen` ordering, conflict policy, `next_poll_ms`) and its
   **vitest** suite (stack-memo §5).
@@ -325,7 +325,9 @@ impossible to arrive at.
    (memo §0, §5.3).
 2. **Nothing dials the board.** No inbound listener is added to the panel, and the server never
    pushes to it (memo §2, §4).
-3. **The remote mimics the buttons and nothing else.** Four events; no fifth (memo §0, §3, §12).
+3. **The remote mimics the buttons and nothing else.** One event per routine plus `reset`; nothing
+   further (memo §0, §3, §12). The remote-only `shoes` routine is still a routine event, not a new
+   kind of one.
 4. **Pending state expires; it never queues** (memo §5.4).
 5. **"Sent" is never presented as "done"** (memo §9.1).
 6. **`/device/*` is never routed by the tunnel; nothing else is either** (memo §8.4).

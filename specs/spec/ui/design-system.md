@@ -5,10 +5,11 @@ memo §9, §9.1, §12; default conventions (WCAG 2.1 AA, semantic HTML, keyboard
 
 ## 1. Mandatory UI rules
 
-1. **Exactly four *panel* controls, mirroring the panel.** Three routine buttons carrying the same
-   symbols as the physical caps — duck, book, toy-box — and **one Cancel**. The phone and the panel
-   teach the same mapping; the consistency is free and it is why v1.5 §4d's artwork is reusable here
-   (memo §9). Nothing *else* is a button, save the one deliberate addition below: the **idle-only
+1. **One control per routine, plus one Cancel, mirroring the panel.** The three routines the panel
+   has caps for carry the same symbols — duck, book, toy-box — and the remote-only **Shoes On**
+   carries a shoe; then **one Cancel**. The phone and the panel teach the same mapping for everything
+   the panel has; the remote-only routine is the single deliberate addition, and a panel whose
+   firmware does not know it is not offered it at all (memo §9). Nothing *else* is a button, save the one deliberate addition below: the **idle-only
    message composer** (§10), which is idle-screen content rather than a panel button and, being
    idle-only, is absent from every other state.
 2. **A live mirror**: current state, routine, counting-down time (interpolated locally between polls),
@@ -60,8 +61,8 @@ label "Cleanup" on both surfaces — memo §12). No component hard-codes a label
 │  │   BATHTIME   3:34      │  │   re-synced on every poll (memo §5.3)
 │  └────────────────────────┘  │
 │                              │
-│  [ 🦆 ]    [ 📖 ]   [ 🧸 ]   │   three routine buttons, panel symbols,
-│  Bathtime  Booktime  Cleanup │   labels from routines.json
+│ [🦆] [📖] [🧸] [👟]          │   one button per routine, panel symbols,
+│ Bathtime Booktime Cleanup Shoes On │   labels from routines.json
 │                              │
 │  ┌────────────────────────┐  │
 │  │        CANCEL          │  │   one big button; maps to D; red
@@ -172,7 +173,7 @@ formatters** — the tile is the mirror of §3 with the controls removed.
   standalone chip chrome), so the tile cannot drift from the remote — and neither can drift from the
   panel. With **no reading it renders nothing** — no placeholder that looks like weather — and it appears
   on the idle screen only, the one state the panel draws the weather in.
-- **The three routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
+- **The routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
   the same symbol language as the buttons, with no affordance to press.
 - **Not an API surface.** `/tile` is a page; it adds no route. (The one surface added since memo §6's
   route set is the idle-only `POST /api/message`, §10 — the tile touches neither.)

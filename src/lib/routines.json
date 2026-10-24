@@ -18,6 +18,12 @@
       "label": "Cleanup",
       "symbol": "toy-box",
       "artwork": "🧸"
+    },
+    {
+      "id": "shoes",
+      "label": "Shoes On",
+      "symbol": "shoe",
+      "artwork": "👟"
     }
   ]
 }

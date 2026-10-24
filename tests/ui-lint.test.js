@@ -1,7 +1,8 @@
 /**
  * D5 — schema-lint and accessibility checks.
  *
- * 1. `routines.json` is the single source of truth: exactly three routines, and
+ * 1. `routines.json` is the single source of truth: exactly the expected
+ *    routines, and
  *    no `.svelte` file hard-codes a routine label, a routine id, or an artwork
  *    path (`design-system.md` §2; `implementation-considerations §8`).
  * 2. The dark palette meets WCAG 2.1 AA contrast for the tokens the UI actually
@@ -33,18 +34,25 @@ const svelteSources = svelteFiles().map((file) => ({
 }));
 
 describe("routines.json — the single source of truth", () => {
-  it("has exactly the three routines, with the shared labels", () => {
+  it("has exactly the expected routines, with the shared labels", () => {
     expect(routines.map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
       "cleanup",
+      "shoes",
     ]);
     expect(routines.map((r) => r.label)).toEqual([
       "Bathtime",
       "Booktime",
       "Cleanup",
+      "Shoes On",
     ]);
-    expect(routines.map((r) => r.symbol)).toEqual(["duck", "book", "toy-box"]);
+    expect(routines.map((r) => r.symbol)).toEqual([
+      "duck",
+      "book",
+      "toy-box",
+      "shoe",
+    ]);
     for (const routine of routines) {
       expect(typeof routine.artwork).toBe("string");
       expect(routine.artwork.length).toBeGreaterThan(0);

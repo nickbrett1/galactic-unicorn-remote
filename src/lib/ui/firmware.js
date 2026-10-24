@@ -81,3 +81,36 @@ export function availableMinutes(fw) {
     return since === undefined || compareFirmware(fw, since) >= 0;
   });
 }
+
+/*
+ * The same honesty rule, one step further: a routine the panel's firmware
+ * cannot know. `shoes` is remote-only (the panel has A/B/C plus D for cancel),
+ * and a board older than 0.1.54 has `ROUTINE_IDS` without it — its
+ * `reconcile.event_for_desired` drops the start without a word while the poll
+ * still reports "applied", so the button would promise a timer that never
+ * starts. Withhold it rather than offer a lie, exactly as `availableMinutes`
+ * does for a length.
+ */
+
+/** The board firmware that first knows the remote-only `shoes` routine (board `0.1.54`). */
+export const SHOES_SINCE = "0.1.54";
+
+/** The earliest firmware that knows each routine added after the original three. */
+const ROUTINE_SINCE = Object.freeze({
+  shoes: SHOES_SINCE,
+});
+
+/**
+ * The routines a panel reporting `fw` can actually start, in catalogue order.
+ * A routine with no entry in `ROUTINE_SINCE` is as old as the remote itself.
+ *
+ * @param {ReadonlyArray<{id: string}>} routines the catalogue from `snapshot.routines`
+ * @param {string | null | undefined} fw the panel's reported firmware version
+ * @returns {ReadonlyArray<{id: string}>}
+ */
+export function availableRoutines(routines, fw) {
+  return routines.filter((routine) => {
+    const since = ROUTINE_SINCE[routine.id];
+    return since === undefined || compareFirmware(fw, since) >= 0;
+  });
+}

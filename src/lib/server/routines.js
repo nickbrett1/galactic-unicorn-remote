@@ -14,7 +14,7 @@ export const routines = Object.freeze(
   catalogue.routines.map((routine) => Object.freeze({ ...routine })),
 );
 
-/** The three routine ids, in catalogue order. The remote's start vocabulary. */
+/** The routine ids, in catalogue order. The remote's start vocabulary. */
 export const ROUTINE_IDS = Object.freeze(routines.map((routine) => routine.id));
 
 /** The default routine (the first in the catalogue) — used by the UI's initial paint. */
