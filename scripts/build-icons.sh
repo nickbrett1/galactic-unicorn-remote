@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# Generate Home Display icon assets: master 1024, apple-touch-icon (180),
-# PWA icons (192, 512), and favicon (64).
+# Generate the Home Display icon assets.
+#
+# The icon is a countdown, not a routine: a bright green timer arc that is
+# ~72% swept, on the panel's near-black, over a faint LED-matrix texture. The
+# green is the house "go" token (--c-go) and the dot grid is the physical
+# Pimoroni Galactic Unicorn's matrix. Deliberately no routine symbol — the duck
+# / book / toy-box / shoe each stand for one of four routines, so none of them
+# can stand for the remote itself (routines.json is the identity source *in the
+# UI*; the app icon is the product, not a routine).
+#
+# Writes: apple-touch-icon-180.png, icon-192.png, icon-512.png, favicon.png.
+# The 180px name is deliberately stable: Cloudflare Access bypasses that exact
+# path, so renaming it means a new Access application.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATIC="$ROOT/static"
@@ -11,78 +22,43 @@ mkdir -p "$STATIC"
 cd "$TMP"
 S=1024
 
-# 1. Base dark background with slight radial lift (near-black #0b0e0d)
-magick -size ${S}x${S} radial-gradient:'#18231f-#080b0a' base.png
+# 1. Base: near-black with a soft lift off-centre
+magick -size ${S}x${S} radial-gradient:'#18231f-#080b0a' bg.png
 
-# 2. Subtle LED matrix dots (the panel's physical LED array)
+# 2. Faint LED matrix — the panel's physical array
 magick -size 64x64 xc:none -fill 'rgba(52,201,106,0.10)' \
   -draw 'circle 32,32 32,29' dot.png
-magick base.png \( -size ${S}x${S} tile:dot.png \) -compose Over -composite base_grid.png
+magick bg.png \( -size ${S}x${S} tile:dot.png \) -compose Over -composite base.png
 
-# 3. Soft ambient glow layer behind the duck (blurred)
-magick -size ${S}x${S} xc:black \
-  -fill '#34c96a' \
-  -draw "polygon 640,540 860,390 760,670" \
-  -draw "ellipse 530,620 230,165 0,360" \
-  -draw "circle 390,410 390,270" \
-  -draw "path 'M 360,395 Q 195,400 135,425 Q 120,435 130,448 Q 185,465 360,460 Z'" \
-  glow_raw.png
-magick glow_raw.png -blur 0x44 glow_blur.png
-magick base_grid.png glow_blur.png -compose Screen -composite canvas_with_glow.png
+# 3. Timer arc geometry: radius 274, 96px stroke, 72% swept clockwise from 12.
+#    The sweep is 72% rather than 75% so the gap reads as deliberate at 60px.
+CX=512 CY=512 R=274
+SWEEP=259.2   # 0.72 * 360
+END_X=$(python3 -c "import math;print(f'{$CX + $R*math.cos(math.radians(-90+$SWEEP)):.1f}')")
+END_Y=$(python3 -c "import math;print(f'{$CY + $R*math.sin(math.radians(-90+$SWEEP)):.1f}')")
 
-# 4. Render duck
-magick canvas_with_glow.png \
-  -stroke none \
-  `# --- Bedtime / Galactic stars (top right) ---` \
-  -fill 'rgba(255,255,255,0.85)' \
-  -draw "path 'M 820,185 Q 820,215 850,215 Q 820,215 820,245 Q 820,215 790,215 Q 820,215 820,185 Z'" \
-  -fill 'rgba(52,201,106,0.75)' \
-  -draw "path 'M 720,265 Q 720,282 737,282 Q 720,282 720,299 Q 720,282 703,282 Q 720,282 720,265 Z'" \
-  -fill 'rgba(255,255,255,0.5)' \
-  -draw "circle 890,275 890,271" \
-  `# --- Water reflection pool beneath duck ---` \
-  -fill 'rgba(52,201,106,0.16)' -draw "ellipse 520,775 270,36 0,360" \
-  -fill 'rgba(52,201,106,0.30)' -draw "ellipse 510,770 190,20 0,360" \
-  `# --- BEAK (drawn BEFORE head so head circle cleanly masks the root) ---` \
-  -fill '#f0b429' \
-  -draw "path 'M 360,395 Q 195,400 135,425 Q 120,435 130,448 Q 185,465 360,460 Z'" \
-  -fill '#d49b1a' \
-  -draw "path 'M 130,448 Q 185,465 360,460 L 360,442 Q 185,448 135,438 Z'" \
-  -fill none -stroke '#9b6807' \
-  -draw "stroke-linecap round stroke-width 6 path 'M 134,440 Q 200,446 360,432'" \
-  -stroke none \
-  -fill '#9b6807' -draw "ellipse 225,418 6,4 -10,350" \
-  `# --- DUCK SILHOUETTE (solid #34c96a) ---` \
-  -fill '#34c96a' \
-  -draw "path 'M 620,560 Q 750,560 865,390 Q 815,570 710,685 Z'" \
-  -draw "ellipse 530,620 225,160 0,360" \
-  -draw "polygon 300,430 460,430 480,570 340,570" \
-  -draw "circle 390,410 390,270" \
-  `# --- Wing: sleek darker tone with warm highlight ---` \
-  -fill '#1c8c49' \
-  -draw "path 'M 470,600 Q 610,535 710,580 Q 670,700 550,700 Q 485,675 470,600 Z'" \
-  -fill '#27a557' \
-  -draw "path 'M 490,610 Q 605,555 680,595 Q 640,680 555,680 Q 505,665 490,610 Z'" \
-  `# --- Eye: friendly cartoon eye with dual sparkle ---` \
-  -fill '#080b0a' -draw "circle 375,370 375,340" \
-  -fill '#ffffff' -draw "circle 364,360 364,351" \
-  -fill '#ffffff' -draw "circle 388,382 388,378" \
+# 4. Glow: the lit arc, blurred, screened behind the sharp arc
+magick -size ${S}x${S} xc:black -stroke '#34c96a' -fill none \
+  -draw "stroke-width 96 stroke-linecap round path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $END_X,$END_Y'" \
+  arc_glow_raw.png
+magick arc_glow_raw.png -blur 0x40 arc_glow.png
+magick base.png arc_glow.png -compose Screen -composite canvas.png
+
+# 5. Sharp arc: dim full track, then the lit sweep, then the centre hub
+magick canvas.png -stroke none \
+  -stroke 'rgba(52,201,106,0.14)' -fill none \
+  -draw "stroke-width 96 path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $((CX)),$((CY+R)) A $R,$R 0 0 1 $CX,$((CY-R))'" \
+  -stroke '#34c96a' \
+  -draw "stroke-width 96 stroke-linecap round path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $END_X,$END_Y'" \
+  -stroke none -fill '#34c96a' -draw "circle $CX,$CY $CX,$((CY+40))" \
   master-1024.png
 
-# 5. Export targets into static/
-# 8-bit RGB (no alpha): what Apple asks for, and smaller than the 16-bit master.
-# The home-screen file name carries a version because Safari caches
-# apple-touch-icon per URL — a new name is the only reliable way to make an
-# iPhone re-fetch it (see scripts/README note in the commit message).
-magick master-1024.png -resize 180x180 -depth 8 -alpha off \
-  -strip "$STATIC/apple-touch-icon-180.png"
-
-# PWA icons
+# 6. Export. 8-bit RGB, no alpha: what Apple expects, and much smaller.
+magick master-1024.png -resize 180x180 -depth 8 -alpha off -strip \
+  "$STATIC/apple-touch-icon-180.png"
 magick master-1024.png -resize 192x192 -depth 8 -alpha off -strip "$STATIC/icon-192.png"
 magick master-1024.png -resize 512x512 -depth 8 -alpha off -strip "$STATIC/icon-512.png"
-
-# Favicon for browser tabs
 magick master-1024.png -resize 64x64 -depth 8 -alpha off -strip "$STATIC/favicon.png"
 
 echo "Generated icons in $STATIC:"
-ls -lh "$STATIC"
+ls -lh "$STATIC"/*.png
