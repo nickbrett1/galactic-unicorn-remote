@@ -70,15 +70,19 @@ magick canvas_with_glow.png \
   master-1024.png
 
 # 5. Export targets into static/
-# apple-touch-icon: 180x180, square full-bleed (iOS applies the squircle mask)
-magick master-1024.png -resize 180x180 -quality 95 "$STATIC/apple-touch-icon.png"
+# 8-bit RGB (no alpha): what Apple asks for, and smaller than the 16-bit master.
+# The home-screen file name carries a version because Safari caches
+# apple-touch-icon per URL — a new name is the only reliable way to make an
+# iPhone re-fetch it (see scripts/README note in the commit message).
+magick master-1024.png -resize 180x180 -depth 8 -alpha off \
+  -strip "$STATIC/apple-touch-icon-180.png"
 
 # PWA icons
-magick master-1024.png -resize 192x192 -quality 95 "$STATIC/icon-192.png"
-magick master-1024.png -resize 512x512 -quality 95 "$STATIC/icon-512.png"
+magick master-1024.png -resize 192x192 -depth 8 -alpha off -strip "$STATIC/icon-192.png"
+magick master-1024.png -resize 512x512 -depth 8 -alpha off -strip "$STATIC/icon-512.png"
 
 # Favicon for browser tabs
-magick master-1024.png -resize 64x64 "$STATIC/favicon.png"
+magick master-1024.png -resize 64x64 -depth 8 -alpha off -strip "$STATIC/favicon.png"
 
 echo "Generated icons in $STATIC:"
 ls -lh "$STATIC"

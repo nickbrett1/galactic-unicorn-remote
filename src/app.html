@@ -2,12 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+    <link rel="icon" href="/favicon.png" />
+    <!-- iOS caches apple-touch-icon per URL, so a *new file name* is the only
+         reliable way to make a phone re-fetch it: bump the file when the
+         artwork changes rather than overwriting it in place. -->
     <link
       rel="apple-touch-icon"
-      href="%sveltekit.assets%/apple-touch-icon.png"
+      sizes="180x180"
+      href="/apple-touch-icon-180.png"
     />
-    <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
       name="apple-mobile-web-app-status-bar-style"
