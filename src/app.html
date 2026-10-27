@@ -3,13 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.png" />
-    <!-- iOS caches apple-touch-icon per URL, so a *new file name* is the only
-         reliable way to make a phone re-fetch it: bump the file when the
-         artwork changes rather than overwriting it in place. -->
+    <!-- iOS caches apple-touch-icon per URL, and static assets are served with
+         max-age=14400, so overwriting the artwork in place leaves phones on the
+         old image for up to 4h. Bump ?v= whenever the icon changes: the path
+         stays identical (the Cloudflare Access bypass is scoped to it) while
+         the URL changes, which busts both the edge and the device cache. -->
     <link
       rel="apple-touch-icon"
       sizes="180x180"
-      href="/apple-touch-icon-180.png"
+      href="/apple-touch-icon-180.png?v=2"
     />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
