@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # Generate the Home Display icon assets.
 #
-# The icon is a countdown, not a routine: a bright green timer arc that is
-# ~72% swept, on the panel's near-black, over a faint LED-matrix texture. The
-# green is the house "go" token (--c-go) and the dot grid is the physical
-# Pimoroni Galactic Unicorn's matrix. Deliberately no routine symbol — the duck
-# / book / toy-box / shoe each stand for one of four routines, so none of them
-# can stand for the remote itself (routines.json is the identity source *in the
-# UI*; the app icon is the product, not a routine).
+# The icon is a countdown drawn as the panel's own LEDs: 28 discrete dots
+# arranged in a ring, the first 21 lit in the house green (--c-go) and the last
+# 7 left dim, on the panel's near-black over a faint LED-matrix texture.
+# It reads as "the Galactic Unicorn is counting down" rather than as any one
+# routine — the duck / book / toy-box / shoe each stand for a single routine,
+# so none of them can stand for the remote itself.
 #
 # Writes: apple-touch-icon-180.png, icon-192.png, icon-512.png, favicon.png.
-# The 180px name is deliberately stable: Cloudflare Access bypasses that exact
-# path, so renaming it means a new Access application.
+# The path is deliberately stable: a Cloudflare Access bypass is scoped to it.
+# Bump `?v=` in src/app.html to bust device/edge caches when the art changes.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STATIC="$ROOT/static"
@@ -30,28 +29,46 @@ magick -size 64x64 xc:none -fill 'rgba(52,201,106,0.10)' \
   -draw 'circle 32,32 32,29' dot.png
 magick bg.png \( -size ${S}x${S} tile:dot.png \) -compose Over -composite base.png
 
-# 3. Timer arc geometry: radius 274, 96px stroke, 72% swept clockwise from 12.
-#    The sweep is 72% rather than 75% so the gap reads as deliberate at 60px.
-CX=512 CY=512 R=274
-SWEEP=259.2   # 0.72 * 360
-END_X=$(python3 -c "import math;print(f'{$CX + $R*math.cos(math.radians(-90+$SWEEP)):.1f}')")
-END_Y=$(python3 -c "import math;print(f'{$CY + $R*math.sin(math.radians(-90+$SWEEP)):.1f}')")
+# 3. Ring geometry: 16 dots on a 300px radius, 40px dots (80px diameter against
+#    a 118px pitch, so the gaps stay open at 180px and at 64px). 12 of 16 lit =
+#    75%, swept clockwise from 12 o'clock. Discrete dots, not an arc: the
+#    countdown reads in the panel's own LED vocabulary.
+R=300
+DOT=40
+N=16
+LIT=12
 
-# 4. Glow: the lit arc, blurred, screened behind the sharp arc
-magick -size ${S}x${S} xc:black -stroke '#34c96a' -fill none \
-  -draw "stroke-width 96 stroke-linecap round path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $END_X,$END_Y'" \
-  arc_glow_raw.png
-magick arc_glow_raw.png -blur 0x40 arc_glow.png
-magick base.png arc_glow.png -compose Screen -composite canvas.png
+python3 - "$R" "$DOT" "$N" "$LIT" > ring.all <<'PY'
+import math, sys
+R, dot, n, lit = (float(a) for a in sys.argv[1:5])
+R = int(R); dot = int(dot); n = int(n); lit = int(lit)
+cx = cy = 512
+rows = []
+for i in range(n):
+    a = math.radians(-90 + i * 360 / n)
+    x, y = cx + R * math.cos(a), cy + R * math.sin(a)
+    rows.append((i < lit, x, y))
+print('ALL')
+for on, x, y in rows:
+    col = '#34c96a' if on else 'rgba(52,201,106,0.20)'
+    print(f'fill "{col}" circle {x:.1f},{y:.1f} {x:.1f},{y-dot:.1f}')
+print('LIT')
+for on, x, y in rows:
+    if on:
+        print(f'fill "#34c96a" circle {x:.1f},{y:.1f} {x:.1f},{y-dot:.1f}')
+PY
 
-# 5. Sharp arc: dim full track, then the lit sweep, then the centre hub
-magick canvas.png -stroke none \
-  -stroke 'rgba(52,201,106,0.14)' -fill none \
-  -draw "stroke-width 96 path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $((CX)),$((CY+R)) A $R,$R 0 0 1 $CX,$((CY-R))'" \
-  -stroke '#34c96a' \
-  -draw "stroke-width 96 stroke-linecap round path 'M $CX,$((CY-R)) A $R,$R 0 1 1 $END_X,$END_Y'" \
-  -stroke none -fill '#34c96a' -draw "circle $CX,$CY $CX,$((CY+40))" \
-  master-1024.png
+sed -n '/^ALL$/,/^LIT$/p' ring.all | sed '1d;$d' > ring.draw
+sed -n '/^LIT$/,$p' ring.all | sed '1d' > ring_lit.draw
+
+# 4. Glow: the lit dots, blurred, screened behind the sharp ones
+magick -size ${S}x${S} xc:black -stroke none \
+  -draw "$(cat ring_lit.draw)" ring_glow_raw.png
+magick ring_glow_raw.png -blur 0x18 ring_glow.png
+magick base.png ring_glow.png -compose Screen -composite canvas.png
+
+# 5. Sharp ring
+magick canvas.png -stroke none -draw "$(cat ring.draw)" master-1024.png
 
 # 6. Export. 8-bit RGB, no alpha: what Apple expects, and much smaller.
 magick master-1024.png -resize 180x180 -depth 8 -alpha off -strip \
