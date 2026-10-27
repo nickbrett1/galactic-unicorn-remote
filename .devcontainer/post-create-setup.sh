@@ -260,7 +260,7 @@ cat > "$MANAGED_BODY" <<'GOOSECFGBODYEOF'
     type: streamable_http
     name: mcphub-dev
     enabled: true
-    uri: http://nas:8781/mcp/dev
+    uri: http://ryzen:8781/mcp/dev
     timeout: 300
 
   svelte:
@@ -280,7 +280,7 @@ extensions:
     type: streamable_http
     name: mcphub-dev
     enabled: true
-    uri: http://nas:8781/mcp/dev
+    uri: http://ryzen:8781/mcp/dev
     timeout: 300
 
   svelte:
