@@ -163,7 +163,9 @@ describe("D1 — the shell and its controls", () => {
     // start silently, so no button rather than a lie.
     renderPage({ panel: { fw: "0.1.54" } });
     expect(screen.queryByRole("button", { name: "Shoes On" })).toBeNull();
-    for (const routine of ROUTINES.filter((r) => r.id !== "shoes")) {
+    for (const routine of ROUTINES.filter(
+      (r) => !["shoes", "breakfast", "dinner", "lunch"].includes(r.id),
+    )) {
       expect(screen.getByRole("button", { name: routine.label })).toBeTruthy();
     }
   });
@@ -171,6 +173,17 @@ describe("D1 — the shell and its controls", () => {
   it("offers Shoes On once the panel reports firmware that knows it", () => {
     renderPage({ panel: { fw: "0.1.55" } });
     expect(screen.getByRole("button", { name: "Shoes On" })).toBeTruthy();
+    // The mealtime routines arrived a release later, so 0.1.55 still withholds them.
+    for (const label of ["Breakfast", "Dinner", "Lunch"]) {
+      expect(screen.queryByRole("button", { name: label })).toBeNull();
+    }
+  });
+
+  it("offers the mealtime routines once the panel reports firmware that knows them", () => {
+    renderPage({ panel: { fw: "0.1.56" } });
+    for (const label of ["Breakfast", "Dinner", "Lunch"]) {
+      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    }
   });
 
   it("offers the 1/2/3/5/10-minute countdown length, defaulting to 5", () => {

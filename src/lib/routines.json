@@ -1,5 +1,5 @@
 {
-  "$comment": "The routine catalogue — the SINGLE SOURCE OF TRUTH for routine ids, labels and artwork (memo §12; implementation-considerations §8; ui/design-system.md §2). No component or handler may hard-code a label or an artwork path; both surfaces (panel + remote UI) read identity from here. `artwork` is the remote's identity channel for the panel symbol; no icon font, no hard-coded path in any component. Id `cleanup` carries label 'Cleanup' on both surfaces.",
+  "$comment": "The routine catalogue — the SINGLE SOURCE OF TRUTH for routine ids, labels and artwork (memo §12; implementation-considerations §8; ui/design-system.md §2). No component or handler may hard-code a label or an artwork path; both surfaces (panel + remote UI) read identity from here. `artwork` is the remote's identity channel for the panel symbol; no icon font, no hard-coded path in any component. Id `cleanup` carries label 'Cleanup' on both surfaces. Routines are listed in label order: the remote renders this array as-is, so the buttons stay alphabetical.",
   "routines": [
     {
       "id": "bathtime",
@@ -14,10 +14,28 @@
       "artwork": "📖"
     },
     {
+      "id": "breakfast",
+      "label": "Breakfast",
+      "symbol": "bowl",
+      "artwork": "🥣"
+    },
+    {
       "id": "cleanup",
       "label": "Cleanup",
       "symbol": "toy-box",
       "artwork": "🧸"
+    },
+    {
+      "id": "dinner",
+      "label": "Dinner",
+      "symbol": "plate",
+      "artwork": "🍽️"
+    },
+    {
+      "id": "lunch",
+      "label": "Lunch",
+      "symbol": "sandwich",
+      "artwork": "🥪"
     },
     {
       "id": "shoes",

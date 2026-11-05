@@ -22,6 +22,7 @@ import {
 } from "../src/lib/ui/command.js";
 import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
 import {
+  MEALTIME_SINCE,
   SHOES_SINCE,
   TEN_MINUTES_SINCE,
   TWO_MINUTES_SINCE,
@@ -432,7 +433,7 @@ describe("firmware — offer only the lengths the connected panel can honour", (
 });
 
 describe("firmware — offer only the routines the connected panel can start", () => {
-  it("withholds Shoes On from a panel older than the routine", () => {
+  it("withholds Shoes On and the mealtime routines from an older panel", () => {
     expect(availableRoutines(ROUTINES, "0.1.54").map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
@@ -445,13 +446,27 @@ describe("firmware — offer only the routines the connected panel can start", (
     ]);
   });
 
-  it("offers every routine once the panel reports the Shoes On firmware", () => {
+  it("offers Shoes On once the panel reports its firmware, but not the meals", () => {
     expect(availableRoutines(ROUTINES, SHOES_SINCE).map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
       "cleanup",
       "shoes",
     ]);
-    expect(availableRoutines(ROUTINES, "1.0.0")).toHaveLength(4);
+  });
+
+  it("offers every routine once the panel reports the meal firmware", () => {
+    expect(
+      availableRoutines(ROUTINES, MEALTIME_SINCE).map((r) => r.id),
+    ).toEqual([
+      "bathtime",
+      "booktime",
+      "breakfast",
+      "cleanup",
+      "dinner",
+      "lunch",
+      "shoes",
+    ]);
+    expect(availableRoutines(ROUTINES, "1.0.0")).toHaveLength(7);
   });
 });

@@ -38,25 +38,39 @@ describe("routines.json — the single source of truth", () => {
     expect(routines.map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
+      "breakfast",
       "cleanup",
+      "dinner",
+      "lunch",
       "shoes",
     ]);
     expect(routines.map((r) => r.label)).toEqual([
       "Bathtime",
       "Booktime",
+      "Breakfast",
       "Cleanup",
+      "Dinner",
+      "Lunch",
       "Shoes On",
     ]);
     expect(routines.map((r) => r.symbol)).toEqual([
       "duck",
       "book",
+      "bowl",
       "toy-box",
+      "plate",
+      "sandwich",
       "shoe",
     ]);
     for (const routine of routines) {
       expect(typeof routine.artwork).toBe("string");
       expect(routine.artwork.length).toBeGreaterThan(0);
     }
+  });
+
+  it("lists routines in label order, so the UI renders them alphabetically", () => {
+    const labels = routines.map((r) => r.label);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
   });
 });
 

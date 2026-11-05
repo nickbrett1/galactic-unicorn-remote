@@ -322,7 +322,10 @@ describe("event-vocabulary guard — the remote mimics the buttons and nothing e
     expect([...ROUTINE_IDS].sort()).toEqual([
       "bathtime",
       "booktime",
+      "breakfast",
       "cleanup",
+      "dinner",
+      "lunch",
       "shoes",
     ]);
   });
@@ -331,11 +334,14 @@ describe("event-vocabulary guard — the remote mimics the buttons and nothing e
     expect([...DEVICE_EVENTS]).toEqual([
       "bathtime",
       "booktime",
+      "breakfast",
       "cleanup",
+      "dinner",
+      "lunch",
       "shoes",
       "reset",
     ]);
-    expect(DEVICE_EVENTS).toHaveLength(5);
+    expect(DEVICE_EVENTS).toHaveLength(8);
   });
 
   it("maps a cancel to the reset (D) event and nothing else", () => {

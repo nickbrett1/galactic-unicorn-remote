@@ -89,15 +89,23 @@ export function availableMinutes(fw) {
  * `reconcile.event_for_desired` drops the start without a word while the poll
  * still reports "applied", so the button would promise a timer that never
  * starts. Withhold it rather than offer a lie, exactly as `availableMinutes`
- * does for a length.
+ * does for a length. The mealtime routines (breakfast / dinner / lunch) are the
+ * same story: a board older than 0.1.56 has no such ids, so they are withheld
+ * until the panel reports a firmware that can draw and run them.
  */
 
 /** The board firmware that first knows the remote-only `shoes` routine (board `0.1.55`). */
 export const SHOES_SINCE = "0.1.55";
 
+/** The board firmware that first knows the three mealtime routines (board `0.1.56`). */
+export const MEALTIME_SINCE = "0.1.56";
+
 /** The earliest firmware that knows each routine added after the original three. */
 const ROUTINE_SINCE = Object.freeze({
   shoes: SHOES_SINCE,
+  breakfast: MEALTIME_SINCE,
+  dinner: MEALTIME_SINCE,
+  lunch: MEALTIME_SINCE,
 });
 
 /**
