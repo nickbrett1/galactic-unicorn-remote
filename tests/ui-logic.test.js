@@ -22,9 +22,11 @@ import {
 } from "../src/lib/ui/command.js";
 import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
 import {
+  CLOTHES_SINCE,
   MEALTIME_SINCE,
   SHOES_SINCE,
   TEN_MINUTES_SINCE,
+  TWENTY_MINUTES_SINCE,
   TWO_MINUTES_SINCE,
   availableMinutes,
   availableRoutines,
@@ -406,9 +408,11 @@ describe("firmware — offer only the lengths the connected panel can honour", (
     expect(compareFirmware("dev", "0.1.0")).toBeLessThan(0);
   });
 
-  it("offers the full catalogue once a panel reports the 2-minute firmware", () => {
-    expect(availableMinutes(TWO_MINUTES_SINCE)).toEqual([...MINUTES_CHOICES]);
-    expect(availableMinutes("0.1.53")).toEqual([...MINUTES_CHOICES]);
+  it("offers the full catalogue once a panel reports the 20-minute firmware", () => {
+    expect(availableMinutes(TWENTY_MINUTES_SINCE)).toEqual([
+      ...MINUTES_CHOICES,
+    ]);
+    expect(availableMinutes("0.1.57")).toEqual([...MINUTES_CHOICES]);
     expect(availableMinutes("1.0.0")).toEqual([...MINUTES_CHOICES]);
   });
 
@@ -419,7 +423,14 @@ describe("firmware — offer only the lengths the connected panel can honour", (
     expect(availableMinutes("0.1.51")).toEqual([1, 3, 5, 10]);
   });
 
-  it("withholds 2 and 10 minutes from an older (or unknown) panel", () => {
+  it("offers 2 and 10 but not yet 20 on the firmware between them", () => {
+    // 20 minutes arrives a few releases after 2: a 0.1.52 panel honours
+    // 1/2/3/5/10 and would still downgrade a 20-minute ask.
+    expect(availableMinutes(TWO_MINUTES_SINCE)).toEqual([1, 2, 3, 5, 10]);
+    expect(availableMinutes("0.1.56")).toEqual([1, 2, 3, 5, 10]);
+  });
+
+  it("withholds 2, 10 and 20 minutes from an older (or unknown) panel", () => {
     expect(availableMinutes("0.1.50")).toEqual([1, 3, 5]);
     expect(availableMinutes("0.1.0")).toEqual([1, 3, 5]);
     expect(availableMinutes(undefined)).toEqual([1, 3, 5]);
@@ -455,7 +466,7 @@ describe("firmware — offer only the routines the connected panel can start", (
     ]);
   });
 
-  it("offers every routine once the panel reports the meal firmware", () => {
+  it("offers the mealtime routines once the panel reports their firmware, but not Clothes On", () => {
     expect(
       availableRoutines(ROUTINES, MEALTIME_SINCE).map((r) => r.id),
     ).toEqual([
@@ -467,6 +478,21 @@ describe("firmware — offer only the routines the connected panel can start", (
       "lunch",
       "shoes",
     ]);
-    expect(availableRoutines(ROUTINES, "1.0.0")).toHaveLength(7);
+  });
+
+  it("offers every routine once the panel reports the Clothes On firmware", () => {
+    expect(availableRoutines(ROUTINES, CLOTHES_SINCE).map((r) => r.id)).toEqual(
+      [
+        "bathtime",
+        "booktime",
+        "breakfast",
+        "cleanup",
+        "clothes",
+        "dinner",
+        "lunch",
+        "shoes",
+      ],
+    );
+    expect(availableRoutines(ROUTINES, "1.0.0")).toHaveLength(8);
   });
 });

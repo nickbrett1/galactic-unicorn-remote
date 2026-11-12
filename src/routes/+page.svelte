@@ -5,7 +5,7 @@
    * Mobile-first and deliberately small: "a remote, not a control panel"
    * (`spec/ui/design-system.md`). One button per routine (three on the panel's
    * own buttons, plus the remote-only one) and one Cancel, one
-   * countdown-length chooser (1/2/3/5/10 min, default 5 — T6), a live mirror,
+   * countdown-length chooser (1/2/3/5/10/20 min, default 5 — T6), a live mirror,
    * and the honest "sent vs done" states. A routine or a length the connected
    * panel's firmware cannot honour is withheld, never offered as a lie.
    *
@@ -52,9 +52,10 @@
 
   // The lengths the *connected panel* can honour (T6.1/T6.2 stopgap). A board
   // older than 0.1.51 would silently downgrade a 10-minute ask to its routine
-  // default, and one older than 0.1.52 would do the same for 2 minutes, so never
-  // offer a length it cannot do — better no button than a lie. Unknown `fw` errs
-  // safe the same way; 10 needs >= 0.1.51 and 2 needs >= 0.1.52.
+  // default, one older than 0.1.52 would do the same for 2 minutes, and one
+  // older than 0.1.57 for 20 minutes, so never offer a length it cannot do —
+  // better no button than a lie. Unknown `fw` errs safe the same way; 10 needs
+  // >= 0.1.51, 2 needs >= 0.1.52 and 20 needs >= 0.1.57.
   let offeredMinutes = $derived(availableMinutes(snapshot?.panel?.fw));
 
   // Never leave the chooser on a length the panel dropped out from under it: if

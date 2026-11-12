@@ -746,12 +746,13 @@ describe("/api/state — the snapshot and the 2 s fallback", () => {
     expect(body.panel.wedge).toBe("heap0.link1.other0.cy1.rec1.pk1");
     // how the previous boot ended, relayed verbatim (firmware machine.reset_cause())
     expect(body.panel.reset_cause).toBe(3);
-    expect(body.routines).toHaveLength(7);
+    expect(body.routines).toHaveLength(8);
     expect(body.routines.map((r) => r.id)).toEqual([
       "bathtime",
       "booktime",
       "breakfast",
       "cleanup",
+      "clothes",
       "dinner",
       "lunch",
       "shoes",

@@ -25,6 +25,9 @@ export const TEN_MINUTES_SINCE = "0.1.51";
 /** The board firmware that first accepted a 2-minute countdown (board `0.1.52`). */
 export const TWO_MINUTES_SINCE = "0.1.52";
 
+/** The board firmware that first accepted a 20-minute countdown (board `0.1.57`). */
+export const TWENTY_MINUTES_SINCE = "0.1.57";
+
 /**
  * The earliest firmware that honours each length the remote offers, for the
  * lengths that were added after T6. A length with no entry here (1, 3, 5) is as
@@ -33,6 +36,7 @@ export const TWO_MINUTES_SINCE = "0.1.52";
 const MINUTES_SINCE = Object.freeze({
   2: TWO_MINUTES_SINCE,
   10: TEN_MINUTES_SINCE,
+  20: TWENTY_MINUTES_SINCE,
 });
 
 /**
@@ -91,7 +95,8 @@ export function availableMinutes(fw) {
  * starts. Withhold it rather than offer a lie, exactly as `availableMinutes`
  * does for a length. The mealtime routines (breakfast / dinner / lunch) are the
  * same story: a board older than 0.1.56 has no such ids, so they are withheld
- * until the panel reports a firmware that can draw and run them.
+ * until the panel reports a firmware that can draw and run them. `clothes` is
+ * withheld below 0.1.57 for the same reason.
  */
 
 /** The board firmware that first knows the remote-only `shoes` routine (board `0.1.55`). */
@@ -100,12 +105,16 @@ export const SHOES_SINCE = "0.1.55";
 /** The board firmware that first knows the three mealtime routines (board `0.1.56`). */
 export const MEALTIME_SINCE = "0.1.56";
 
+/** The board firmware that first knows the remote-only `clothes` routine (board `0.1.57`). */
+export const CLOTHES_SINCE = "0.1.57";
+
 /** The earliest firmware that knows each routine added after the original three. */
 const ROUTINE_SINCE = Object.freeze({
   shoes: SHOES_SINCE,
   breakfast: MEALTIME_SINCE,
   dinner: MEALTIME_SINCE,
   lunch: MEALTIME_SINCE,
+  clothes: CLOTHES_SINCE,
 });
 
 /**

@@ -76,7 +76,7 @@ describe("GET /api/events", () => {
     expect(frame).toContain("event: state");
     const payload = JSON.parse(frame.split("data: ")[1]);
     expect(payload.type).toBe("state");
-    expect(payload.state.routines).toHaveLength(7);
+    expect(payload.state.routines).toHaveLength(8);
 
     await reader.cancel();
     expect(subscriberCount()).toBe(0);

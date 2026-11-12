@@ -26,6 +26,12 @@
       "artwork": "🧸"
     },
     {
+      "id": "clothes",
+      "label": "Clothes On",
+      "symbol": "clothes",
+      "artwork": "👕"
+    },
+    {
       "id": "dinner",
       "label": "Dinner",
       "symbol": "plate",

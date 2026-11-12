@@ -324,6 +324,7 @@ describe("event-vocabulary guard — the remote mimics the buttons and nothing e
       "booktime",
       "breakfast",
       "cleanup",
+      "clothes",
       "dinner",
       "lunch",
       "shoes",
@@ -336,12 +337,13 @@ describe("event-vocabulary guard — the remote mimics the buttons and nothing e
       "booktime",
       "breakfast",
       "cleanup",
+      "clothes",
       "dinner",
       "lunch",
       "shoes",
       "reset",
     ]);
-    expect(DEVICE_EVENTS).toHaveLength(8);
+    expect(DEVICE_EVENTS).toHaveLength(9);
   });
 
   it("maps a cancel to the reset (D) event and nothing else", () => {
