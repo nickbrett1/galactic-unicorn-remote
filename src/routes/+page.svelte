@@ -356,7 +356,9 @@
 
 <svelte:head>
   <title>Home Display</title>
-  <meta name="theme-color" content="#0f172a" />
+  <!-- No `theme-color` here: `app.html` owns it, so the browser chrome and
+       `--bg` cannot disagree. A second copy is what let the old navy sit above
+       the new ground. -->
 </svelte:head>
 
 <AppShell
