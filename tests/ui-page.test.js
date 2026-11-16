@@ -158,6 +158,19 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.queryByText(/\+2/)).toBeNull();
   });
 
+  it("stamps the build in the footer, so a stale page is recognisable", () => {
+    // The remote is used from a phone that may be replaying a cached document;
+    // the footer is how "is this the deploy?" is answered by looking at the
+    // screen. `__NB_BUILD__` is "dev" outside an image build, and the label is
+    // its first seven characters — the full sha rides in the `title`.
+    const { container } = renderPage();
+    const footer = container.querySelector(".footer");
+    expect(footer).toBeTruthy();
+    expect(footer.textContent).toContain("build");
+    expect(footer.textContent).toContain("dev");
+    expect(footer.querySelector("[title]").getAttribute("title")).toBe("dev");
+  });
+
   it("withholds Shoes On from a panel whose firmware cannot start it", () => {
     // 0.1.54 is the last board before the routine existed: it would drop the
     // start silently, so no button rather than a lie.

@@ -9,6 +9,11 @@
 
 FROM node:22-slim AS build
 WORKDIR /app
+# The commit this image is built from, passed by the pipeline. It lands in the
+# footer of the remote, which is the only way to answer "am I looking at the
+# deploy?" from a phone that might be showing a cached page.
+ARG NB_BUILD_COMMIT=""
+ENV NB_BUILD_COMMIT=$NB_BUILD_COMMIT
 COPY package.json package-lock.json* .npmrc* ./
 RUN PINNED_NPM="$(node -p "try{require('./package.json').packageManager}catch(e){''}" 2>/dev/null || true)" \
     && if [ -n "$PINNED_NPM" ] && [ "$(npm --version)" != "${PINNED_NPM#npm@}" ]; then \

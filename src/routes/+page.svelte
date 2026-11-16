@@ -30,7 +30,15 @@
   import ConfirmPrompt from "$lib/components/nb/ConfirmPrompt.svelte";
   import PanelScreen from "$lib/ui/PanelScreen.svelte";
 
+  /* global __NB_BUILD__ */
+
   let { data } = $props();
+
+  // Which build is on screen. `__NB_BUILD__` is the commit the image was built
+  // from, baked in by vite's `define`; a checkout or a test run says "dev". Seven
+  // characters is enough to compare against `git log` and short enough for a
+  // 10px micro-label; the full sha is in the `title`.
+  const buildLabel = __NB_BUILD__.slice(0, 7);
 
   // How long the SSE stream may go silent before the 2 s `/api/state` poll takes
   // over. While this page is a live subscriber the board polls every ~2 s, so a
@@ -364,8 +372,11 @@
 <AppShell
   title="Home Display"
   subtitle={data.door?.email ? `signed in as ${data.door.email}` : ""}
-  footer={false}
+  footer={buildFooter}
 >
+  {#snippet buildFooter()}
+    <span class="micro" title={__NB_BUILD__}>build {buildLabel}</span>
+  {/snippet}
   <div class="remote" data-online={online}>
     {#snippet panelScreen()}
       <PanelScreen
