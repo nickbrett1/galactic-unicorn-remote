@@ -80,5 +80,20 @@ export function init() {
  */
 export async function handle({ event, resolve }) {
   event.locals.door = classifyDoor(event.request);
-  return resolve(event);
+  const response = await resolve(event);
+
+  // A phone that has the remote on its home screen keeps the start page in the
+  // WKWebView cache and can serve it back for a long time, because the document
+  // itself is answered without a Cache-Control header (SvelteKit leaves it out,
+  // and the heuristics then apply). That shows up as "the deploy didn't happen":
+  // an old page, with an old stylesheet, long after watchtower replaced the
+  // image. The document is cheap and every deploy changes it, so make the phone
+  // revalidate: the hashed `_app/immutable/*` assets keep their own long-lived
+  // immutable caching and are what actually save the bytes.
+  const type = response.headers.get("content-type") ?? "";
+  if (type.includes("text/html")) {
+    response.headers.set("cache-control", "no-cache, must-revalidate");
+  }
+
+  return response;
 }

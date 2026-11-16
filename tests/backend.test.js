@@ -858,6 +858,35 @@ describe("hooks — surface trust", () => {
     expect(res.status).toBe(422);
   });
 
+  it("makes the page revalidate, so a home-screen copy cannot outlive a deploy", async () => {
+    const html = await handle({
+      event: { request: new Request("http://lan.test/"), locals: {} },
+      resolve: async () =>
+        new Response("<!doctype html>", {
+          headers: { "content-type": "text/html" },
+        }),
+    });
+    expect(html.headers.get("cache-control")).toBe("no-cache, must-revalidate");
+
+    // Hashed immutable assets keep their own caching; only the document changes.
+    const asset = await handle({
+      event: {
+        request: new Request("http://lan.test/_app/immutable/a.js"),
+        locals: {},
+      },
+      resolve: async () =>
+        new Response("x", {
+          headers: {
+            "content-type": "text/javascript",
+            "cache-control": "public, max-age=31536000, immutable",
+          },
+        }),
+    });
+    expect(asset.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable",
+    );
+  });
+
   it("fails fast on startup when the device token is missing in a non-dev run", () => {
     expect(() =>
       assertRuntimeConfig({ deviceToken: "", isDevOrTest: false }),
