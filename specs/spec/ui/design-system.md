@@ -171,7 +171,12 @@ never diagnoses the cause for the user — it states what is known (see `event-f
 - **Full keyboard navigation**: the four panel controls are in DOM order = visual order; normal
   tab/enter operation; a visible focus ring (the composer, when present, follows them, §10.5).
 - **Mobile-first responsive**: designed for a one-handed phone in a dim hallway; landscape must not
-  break the four targets. `viewport-fit` and a large tap target for Cancel.
+  break the four targets. A large tap target for Cancel (56 px), and **no `viewport-fit=cover`**:
+  drawing under the status-bar band is what iOS composites its glass edge-blur over, which is the
+  "blurry strip" the gallery spent three rounds on. `app.html` uses
+  `apple-mobile-web-app-status-bar-style: black` and a plain viewport, so the page starts below the
+  band and `env(safe-area-inset-top)` is zero; the inline `.pwa-status-bar-surface` stays as the
+  answer for an engine that reports an inset anyway (§2, `app.html`).
 - **No child-facing surface**: nothing here is ever shown to the child (memo §12).
 - **Reduced motion**: honour `prefers-reduced-motion` for the confirmation flash and the HANDOFF
   "shout".

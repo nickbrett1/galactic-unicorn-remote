@@ -15,19 +15,65 @@
     />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
+    <!-- Opaque, not translucent, AND no `viewport-fit=cover`.
+         This is the fix the gallery landed in the ui-registry (@nb 1.16.1) and
+         this page was still missing. `black-translucent` plus `viewport-fit`
+         is what asks the web view to draw *under* the status bar: the inset
+         becomes non-zero because the page occupies the band, and then whatever
+         iOS draws there -- and in a home-screen window iOS draws a glass
+         surface that samples the top edge of the page -- is composited over our
+         pixels. An opaque topbar does not help: the blur is above it, in the
+         band. Three rounds of CSS on the gallery (opaque bar, colour surface,
+         opaque status-bar style) each fixed a real layer and the strip was
+         still soft, because none of them stopped the page from occupying the
+         band at all.
+         So: `black` paints a solid strip and starts the page below it, and the
+         viewport no longer claims the band, which makes
+         `env(safe-area-inset-top)` zero. There are no pixels of ours up there
+         for anything to composite over, so the top edge is crisp by
+         construction. The cost is a black strip above the navy ground and the
+         loss of the landscape side insets on a notched phone; on a remote you
+         look at straight on, that is a fair trade.
+         The colour surface in <style> below stays: it costs nothing when the
+         inset is zero, and it is the right answer for an engine that still
+         reports a non-zero inset in this mode. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Home Display" />
     <meta name="theme-color" content="#0b1220" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* iOS standalone's scroll-edge blur, worked around with a colour surface
+         over the band. Inline and before the bundle on purpose: WebKit samples
+         the top edge on the first frame, and a class added by JavaScript is a
+         frame late. See the ui-registry README, "The iOS top-edge surface". */
+      .pwa-status-bar-surface {
+        display: none;
+      }
+      @supports (-webkit-touch-callout: none) and (background-clip: text) {
+        @media (display-mode: standalone) {
+          .pwa-status-bar-surface {
+            display: block;
+            position: fixed;
+            inset: 0 0 auto;
+            /* 11px is the threshold (a thinner background is treated as a
+               border and skipped by the sampler); the inset is added on top
+               because the band WebKit composites over is the safe area, not
+               the top 11px of it. Clipped to empty text, so the extra height
+               paints nothing. */
+            height: calc(11px + env(safe-area-inset-top, 0px));
+            z-index: 100;
+            pointer-events: none;
+            background-color: inherit;
+            -webkit-background-clip: text;
+            background-clip: text; /* Empty text paints nothing over the controls. */
+          }
+        }
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
+    <div class="pwa-status-bar-surface" aria-hidden="true"></div>
     <div style="display: contents">%sveltekit.body%</div>
   </body>
 </html>

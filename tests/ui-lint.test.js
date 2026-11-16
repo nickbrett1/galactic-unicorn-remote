@@ -42,6 +42,34 @@ const svelteSources = svelteFiles().map((file) => ({
   source: readFileSync(file, "utf8"),
 }));
 
+describe("the home-screen top edge is ours, not the system's", () => {
+  const html = readFileSync(join(root, "src/app.html"), "utf8");
+
+  it("does not ask the web view to draw under the status bar", () => {
+    // The strip at the top of the standalone app is iOS compositing a glass
+    // surface over pixels of ours that sit in the status-bar band. `black` plus
+    // a viewport without `cover` keeps the page out of that band entirely, so
+    // there is nothing there to blur. This is the gallery's 1.16.1 fix, and
+    // regressing either line brings the blur back.
+    // The comment above the tag names the attribute, so assert on the tag.
+    const viewport = html.match(/<meta name="viewport" content="([^"]*)"/);
+    expect(viewport).toBeTruthy();
+    expect(viewport[1]).not.toContain("cover");
+    expect(html).toMatch(
+      /apple-mobile-web-app-status-bar-style"\s+content="black"/,
+    );
+  });
+
+  it("keeps the colour surface that covers an engine still reporting an inset", () => {
+    expect(html).toContain('class="pwa-status-bar-surface"');
+    expect(html).toContain("background-clip: text");
+    // Inline and before the bundle: WebKit samples the top edge on frame one.
+    expect(html.indexOf("pwa-status-bar-surface")).toBeLessThan(
+      html.indexOf("%sveltekit.head%"),
+    );
+  });
+});
+
 describe("routines.json — the single source of truth", () => {
   it("has exactly the expected routines, with the shared labels", () => {
     expect(routines.map((r) => r.id)).toEqual([
