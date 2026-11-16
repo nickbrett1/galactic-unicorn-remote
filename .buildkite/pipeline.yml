@@ -44,7 +44,8 @@ steps:
       SMOKE_IMAGE: galactic-unicorn-remote-smoke
     commands:
       - >-
-        docker build -t "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" .
+        docker build --build-arg NB_BUILD_COMMIT="$$BUILDKITE_COMMIT" \
+          -t "$$SMOKE_IMAGE:$$BUILDKITE_COMMIT" .
       - |
         set -euo pipefail
         CONTAINER="$$SMOKE_IMAGE-$$BUILDKITE_JOB_ID"
@@ -142,6 +143,7 @@ steps:
         fi
         docker buildx create --bootstrap --name "$$BUILDX_BUILDER_NAME" >/dev/null
         docker buildx build --builder "$$BUILDX_BUILDER_NAME" --platform linux/amd64 \
+          --build-arg NB_BUILD_COMMIT="$$BUILDKITE_COMMIT" \
           --cache-from type=registry,ref=$$CACHE_REF \
           --cache-to type=registry,ref=$$CACHE_REF,mode=max \
           -t $$IMAGE:$$BUILDKITE_COMMIT -t $$IMAGE:latest --push .
