@@ -64,8 +64,8 @@
     gap: 6px;
     padding: 4px 8px;
     border-radius: var(--radius);
-    background: var(--c-bg);
-    border: 1px solid rgb(255 255 255 / 0.08);
+    background: var(--bg);
+    border: 1px solid var(--line);
   }
 
   .glyph {
@@ -75,7 +75,7 @@
   }
 
   .temp {
-    color: rgb(150, 190, 212);
+    color: var(--accent);
     font-size: 1rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;

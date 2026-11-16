@@ -325,7 +325,7 @@ describe("D6 — the idle-only message composer", () => {
     });
     // A scroll has no meaning over a running countdown: no composer, no field.
     expect(counting.container.querySelector(".message")).toBeNull();
-    expect(counting.container.querySelector("#panel-message")).toBeNull();
+    expect(counting.container.querySelector(".message input")).toBeNull();
     expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
@@ -338,7 +338,7 @@ describe("D6 — the idle-only message composer", () => {
 
   it("bounds the field by the server's length rule", () => {
     const { container } = renderPage({ messageMaxLen: 42 });
-    expect(container.querySelector("#panel-message").maxLength).toBe(42);
+    expect(container.querySelector(".message input").maxLength).toBe(42);
   });
 
   it("posts the message, shows sending…, then 'showing' ONLY on the reported id", async () => {

@@ -24,23 +24,59 @@ memo §9, §9.1, §12; default conventions (WCAG 2.1 AA, semantic HTML, keyboard
    is unaffected (`device-protocols.md` §3).
 6. **The "sent vs done" rule is mandatory, not polish** — see §5.
 
-## 2. Design tokens
+## 2. Design tokens — the house theme, installed
 
-Colours keep the **house language**: **green means go, red unused**. Do not replicate the panel's full
-ramp — the phone is a remote, not a second display (memo §9).
+The palette is **not this app's to invent**. It is the `@nb` theme from the ui-registry
+(`registry/versions/v1.17.0/theme.json`), written into `src/app.css` by the installer, plus exactly
+one rule of this app's own at the bottom of that file. Colours keep the **house language**: green
+means go, red is an exception. Do not replicate the panel's full ramp — the phone is a remote, not a
+second display (memo §9).
 
-| Token | Value intent | Use |
+| Token | Value intent | Use here |
 |---|---|---|
-| `--c-bg` | near-black, matches the panel's dark surround | page background |
-| `--c-surface` | slightly lifted dark | the mirror panel |
-| `--c-go` | **green** (the house "go") | routine buttons, CONFIRMED |
-| `--c-go-dim` | dimmed green | button pressed / send-sending |
-| `--c-text` | high-contrast off-white | body text (AA on `--c-bg`) |
-| `--c-muted` | mid grey | "last seen 2 s ago", secondary labels |
-| `--c-warn` | amber | "sending…", conflict offer |
-| `--c-danger` | **genuinely red** | Cancel *only* — red is otherwise unused (memo §9), so it reads as an exception |
-| `--radius` / `--space-*` | a small 4/8 px scale | one visual grammar |
-| `--tap-min` | **≥ 56 px** | every control; Cancel ≥ 72 px tall |
+| `--bg` | slate ground (`#0f172a`), matches the panel's dark surround | page background, and the ink on a filled `--ok`/`--bad` key |
+| `--bg-raised` | a translucent lift of the ground | `.card`: the mirror, the conflict prompt, the status notice |
+| `--bg-sunken` | the ground *below* the page | the LED matrix the idle screen is drawn on |
+| `--bg-overlay` | the ground made nearly opaque | the sticky top bar of `app-shell` |
+| `--line` / `--line-strong` | hairlines that are tints, not greys | card borders, the segmented control's frame |
+| `--ink` | high-contrast off-white | body text, routine labels |
+| `--ink-dim` | one step down | the countdown figures |
+| `--ink-muted` | muted | "last seen 2 s ago", secondary labels |
+| `--ink-faint` | faintest | the unlit pixels of the LED matrix |
+| `--ink-strong` | the top of the ramp | the routine name on HANDOFF |
+| `--accent` | the house link (sky) | the weather reading on the idle screen |
+| `--ok` / `--ok-bg` | green | routine keys, CONFIRMED, "showing on the panel" |
+| `--warn` / `--warn-bg` | amber | "sending…", a conflict, the offline notice |
+| `--bad` / `--bad-bg` | red | Cancel *only* — red is otherwise unused (memo §9), so it reads as an exception |
+| `--radius` / `--radius-sm` / `--radius-pill` | 8 / 6 / 999 px | one visual grammar |
+| `--mono` | tabular figures | every number: the countdown, the message counter |
+| `--tap` | **56 px**, raised from the theme's 44 px | every control; Cancel is full-width and taller still |
+
+The one app-level override is `:root { --tap: 56px }`: a theme token set to *this* device's role —
+wet hands, arm's length — rather than a new colour. Nothing else is redeclared, so the app cannot
+drift from the house look.
+
+Theme **classes** come with the theme and are the only styling vocabulary: `.card`, `.pill`, `.seg`
+(+ `.seg.tap`, a segmented control that owns its row), `.btn` (+ `.primary`), `.notice` (+ `.warn`),
+`.micro`, `.section-title`, `.lede`, `.quiet`, `.muted`, `.num`, `mark`.
+
+### 2.1 The blocks this screen is made of
+
+The UI is assembled from published, pinned ui-registry blocks — vendored verbatim into
+`src/lib/components/nb/` and checked against `.nb-registry.json` (1.17.0) by
+`scripts/check-nb-blocks.mjs`. Editing one here is a bug; upgrade the pin instead.
+
+| Block | What it is on this screen |
+|---|---|
+| `app-shell` | the sticky, opaque top bar: "Home Display" and the Access email |
+| `device-mirror` | the mirror: freshness heartbeat, the LED idle screen (slot), headline, relayed countdown, state word, live banner |
+| `command-pad` | one key per routine (glyph + tone) plus the full-width Cancel, with busy/confirmed states; on `/tile` the same pad `readonly` is the legend |
+| `message-bar` | the idle-only composer: one line, the server's limit, a pending Send |
+| `confirm-prompt` | the 409 as a question: Replace / Keep, with focus handed to Replace |
+
+What is *not* a block and stays in the app: `src/lib/ui/PanelScreen.svelte`, because it is a picture
+of this panel (a 53×11 LED matrix) and not a layout — it is handed to `device-mirror` through its
+`screen` slot.
 
 Typography: one sans family, a system stack; display sizes so "BATHTIME" is legible at arm's length
 in a dim room. No icon font — the symbol artwork is the identity channel (memo §12).
@@ -51,23 +87,33 @@ label "Cleanup" on both surfaces — memo §12). No component hard-codes a label
 ## 3. Layout
 
 ```
-┌──────────────────────────────┐
-│  Home Display                │   header; Access email shown only when
-│  signed in as ts.akhtar@…    │   present (display/audit — never auth, memo §8.3)
-├──────────────────────────────┤
-│  ┌────────────────────────┐  │
-│  │   MIRROR               │  │   state + routine + remaining_s
-│  │   ● panel: seen 2s ago │  │   remaining_s interpolated locally,
-│  │   BATHTIME   3:34      │  │   re-synced on every poll (memo §5.3)
-│  └────────────────────────┘  │
-│                              │
-│ [🦆] [📖] [🧸] [👟]          │   one button per routine, panel symbols,
-│ Bathtime Booktime Cleanup Shoes On │   labels from routines.json
-│                              │
-│  ┌────────────────────────┐  │
-│  │        CANCEL          │  │   one big button; maps to D; red
-│  └────────────────────────┘  │
-└──────────────────────────────┘
+┌────────────────────────────────────┐
+│ Home Display                       │  app-shell: sticky, opaque top bar;
+│ signed in as ts.akhtar@…           │  Access email only when present
+├────────────────────────────────────┤  (display/audit — never auth, memo §8.3)
+│ ┌────────────────────────────────┐ │
+│ │ ● panel: last seen 2 s ago     │ │  device-mirror: liveness = how fresh
+│ │ ┌────────────────────────────┐ │ │  the board is; the screen below is
+│ │ │ ▦ 53×11 LED matrix         │ │ │  the slot — the panel's own idle
+│ │ │                   ☁ 18°    │ │ │  drawing, passed in by the app
+│ │ └────────────────────────────┘ │ │
+│ │        Bathtime                │ │  headline (idle) or BATHTIME! (handoff)
+│ │        3:34                    │ │  countdown: relayed, interpolated
+│ │ COUNTING DOWN                  │ │  state word — the state in words
+│ └────────────────────────────────┘ │
+│                                    │
+│  [ 1 ][ 2 ][ 3 ][ 5 ][ 10 ]        │  .seg.tap: countdown length (T6),
+│                                    │  owns its row, 56 px targets
+│ ┌──────────┬──────────┬──────────┐ │
+│ │    🦆    │    📖    │    🧸    │ │  command-pad: one key per routine
+│ │ Bathtime │ Booktime │ Cleanup  │ │  (glyph + label from routines.json)
+│ ├──────────┴──────────┴──────────┤ │
+│ │             ✕ Cancel           │ │  full-width, `--bad`; maps to D
+│ └────────────────────────────────┘ │
+│ ┌──────────────────────────────┬─┐ │
+│ │ Message for the panel…       │→│ │  message-bar: idle only, server's
+│ └──────────────────────────────┴─┘ │  limit, Send pending until acked
+└────────────────────────────────────┘
 ```
 
 HANDOFF renders briefly as the routine name + "!" ("BATHTIME!") — the only place the mirror shouts,
@@ -75,20 +121,21 @@ mirroring the panel's announcement (memo §9).
 
 The **idle-only message composer** (§10) sits below Cancel, and only while the panel is idle — a
 secondary input + Send row that is absent in every other state, since a scroll over a countdown
-would mean nothing.
+would mean nothing. A 409 replaces nothing on this screen: `confirm-prompt` is drawn *above* the pad
+with Replace focused, and the pressed key is left untouched until the reader answers.
 
 ## 4. Interaction states per control
 
 | State | Rendering | Rule source |
 |---|---|---|
 | `idle` | normal, enabled | — |
-| `pressing` | `--c-go-dim`, immediate | optimistic *press*, never optimistic *success* |
-| `sending…` | `--c-warn` + a spinner + "sent…" text | memo §9.1 |
-| `confirmed` | `--c-go` flash + "confirmed" | only when `applied_gen` advanced |
-| `failed/expired` | `--c-warn` + "the panel didn't answer (last seen 3m ago)" | memo §9.1 |
+| `pressing` | `--ok-bg`, immediate | optimistic *press*, never optimistic *success* |
+| `sending…` | `--warn` + a spinner + "sent…" text | memo §9.1 |
+| `confirmed` | `--ok` flash + "confirmed" | only when `applied_gen` advanced |
+| `failed/expired` | `--warn` + "the panel didn't answer (last seen 3m ago)" | memo §9.1 |
 | `offline` | controls **disabled** or loudly caveated | memo §9.1 |
 | `conflict` | an inline affordance: "booktime is running — **Replace**" | memo §5.5 |
-| `not_idle` | `--c-warn` + "the panel isn't idle — messages only show when it is"; **no** Replace | §10.3 — the answer to a message sent off-idle |
+| `not_idle` | `--warn` + "the panel isn't idle — messages only show when it is"; **no** Replace | §10.3 — the answer to a message sent off-idle |
 
 ## 5. The one hard UX rule (memo §9.1)
 
@@ -111,8 +158,8 @@ never diagnoses the cause for the user — it states what is known (see `event-f
 
 ## 6. Accessibility and platform (default conventions apply)
 
-- **WCAG 2.1 AA**: contrast checked on the dark palette for `--c-text`, `--c-go`, `--c-warn`,
-  `--c-danger`; never colour alone — every state carries a word ("confirmed", "sending…", "offline").
+- **WCAG 2.1 AA**: contrast checked on the dark palette for `--ink`, `--ok`, `--warn`,
+  `--bad`; never colour alone — every state carries a word ("confirmed", "sending…", "offline").
 - **Semantic HTML first**: the four panel controls are `<button>` elements, and so is the idle-only
   Send (§10); the mirror is a live region (`aria-live="polite"`) so state changes are announced; the
   conflict affordance is a real dialog or an inline disclosure, with focus moved to it.
@@ -173,7 +220,7 @@ formatters** — the tile is the mirror of §3 with the controls removed.
   standalone chip chrome), so the tile cannot drift from the remote — and neither can drift from the
   panel. With **no reading it renders nothing** — no placeholder that looks like weather — and it appears
   on the idle screen only, the one state the panel draws the weather in.
-- **The routine caps appear as inert chips**, the active one filled with `--c-go` and the rest dimmed —
+- **The routine caps appear as inert chips**, the active one filled with `--ok` and the rest dimmed —
   the same symbol language as the buttons, with no affordance to press.
 - **Not an API surface.** `/tile` is a page; it adds no route. (The one surface added since memo §6's
   route set is the idle-only `POST /api/message`, §10 — the tile touches neither.)
@@ -223,13 +270,13 @@ state, with no mode for the user to get stuck in.
 The banner is a slot with its own monotonic `id`, not a `gen`, and its 202 is an *acceptance*, not a
 *done*. So the composer follows §5 exactly, with the acknowledgement swapped in:
 
-- **Sent** → `sending…` (`--c-warn`), exactly like a routine press.
-- **Confirmed** → "showing on the panel" (`--c-go`), and **only** when the board reports the same
+- **Sent** → `sending…` (`--warn`), exactly like a routine press.
+- **Confirmed** → "showing on the panel" (`--ok`), and **only** when the board reports the same
   `message_id` this phone sent (`ui/command.js` confirms on `panel.message_id === status.messageId`).
   The reduced state is `idle`, not `confirmed`, until then.
 - **A busy 409 is `not_idle`, not a conflict.** A routine 409 means "another routine is running —
   Replace?" (§4). A message 409 means "there is no idle screen to put this on", so it reads
-  **"the panel isn't idle — messages only show when it is"** (`--c-warn`) and offers **no Replace
+  **"the panel isn't idle — messages only show when it is"** (`--warn`) and offers **no Replace
   button** — there is nothing to replace; the composer will simply not be there once the state frame
   lands.
 - **Offline** → "the panel didn't answer…" as in §5; the composer is gone on the next frame regardless.

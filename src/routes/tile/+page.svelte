@@ -3,11 +3,15 @@
    * The glanceable tile — a **read-only mirror** for the Homepage dashboard.
    *
    * It shows exactly what the drill-in mirror shows (state, routine, the
-   * locally-interpolated countdown, the liveness heartbeat) and nothing that can
-   * be pressed: it is an embed, not a remote (`spec/ui/design-system.md` §1, §9).
-   * All wording comes from the shared pure formatters, so the tile cannot drift
-   * from the remote's language; routine labels and artwork come only from the
-   * catalogue on `data`.
+   * locally-interpolated countdown) and nothing that can be pressed: it is an
+   * embed, not a remote (`spec/ui/design-system.md` §1, §9). All wording comes
+   * from the shared pure formatters, so the tile cannot drift from the remote's
+   * language; routine labels and artwork come only from the catalogue on `data`.
+   *
+   * Both shapes are the registry's: `DeviceMirror` with `compact` (no liveness
+   * line, a widget has no room to explain it) and `CommandPad` with `readonly`
+   * — the same keypad as the remote, with the active routine lit and no press
+   * affordance.
    */
   import { onMount, untrack } from "svelte";
   import {
@@ -15,7 +19,9 @@
     mirrorHeadline,
     stateWord,
   } from "$lib/ui/format.js";
-  import WeatherIndicator from "$lib/ui/WeatherIndicator.svelte";
+  import DeviceMirror from "$lib/components/nb/DeviceMirror.svelte";
+  import CommandPad from "$lib/components/nb/CommandPad.svelte";
+  import PanelScreen from "$lib/ui/PanelScreen.svelte";
 
   let { data } = $props();
 
@@ -53,6 +59,15 @@
   let countdownText = $derived(formatCountdown(remaining));
   let headline = $derived(mirrorHeadline(snapshot?.panel ?? {}, routines));
   let stateWordText = $derived(stateWord(snapshot?.panel?.state));
+
+  // The routine caps as a legend, never buttons.
+  let legend = $derived(
+    routines.map((routine) => ({
+      id: routine.id,
+      label: routine.label,
+      icon: routine.artwork,
+    })),
+  );
 
   function applySnapshot(next) {
     if (!next) return;
@@ -134,182 +149,46 @@
 </script>
 
 <main class="tile" data-online={online} data-state={snapshot.panel.state}>
-  <section
-    class="mirror"
-    aria-live="polite"
-    class:idle={headline.idle}
-    class:shout={headline.shout}
-    class:handoff={snapshot.panel.state === "handoff"}
-  >
-    {#if headline.idle}
-      <!-- The idle headline is a picture of the panel itself: a 53x11 LED
-           matrix, dark body, one lit pixel in the top-left. Inline only —
-           no external artwork (`tests/ui-lint.test.js`). The panel's own idle
-           screen shows the weather, so the reading is drawn INSIDE this
-           picture (§9), not below it. -->
-      <span class="panel" role="img" aria-label="Panel: idle, top-left pixel lit">
-        <svg class="grid" viewBox="0 0 53 11" aria-hidden="true" focusable="false">
-          <defs>
-            <pattern
-              id="panel-dots"
-              width="1"
-              height="1"
-              patternUnits="userSpaceOnUse"
-            >
-              <circle cx="0.5" cy="0.5" r="0.16" fill="var(--c-muted)" />
-            </pattern>
-          </defs>
-          <rect
-            x="0.25"
-            y="0.25"
-            width="52.5"
-            height="10.5"
-            rx="1.5"
-            fill="var(--c-surface)"
-            stroke="var(--c-muted)"
-            stroke-width="0.5"
-          />
-          <rect
-            x="0.25"
-            y="0.25"
-            width="52.5"
-            height="10.5"
-            rx="1.5"
-            fill="url(#panel-dots)"
-            opacity="0.25"
-          />
-          <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
-        </svg>
-        <!-- The same reading the panel draws on its idle screen, from the same
-             component and the same firmware masks as `/` (design-system.md §9).
-             Drawn inside the picture; idle only, and no reading renders
-             nothing. -->
-        <WeatherIndicator
-          variant="screen"
-          condition={snapshot.panel?.condition}
-          tempC={snapshot.panel?.temp_c}
-        />
-      </span>
-    {:else}
-      <p class="headline">{headline.text}</p>
-    {/if}
-    {#if snapshot.panel.state === "countdown" && countdownText}
-      <p class="countdown">{countdownText}</p>
-    {/if}
-    <p class="stateword">{stateWordText}</p>
-  </section>
+  {#snippet panelScreen()}
+    <PanelScreen
+      maxWidth="180px"
+      condition={snapshot.panel?.condition}
+      tempC={snapshot.panel?.temp_c}
+    />
+  {/snippet}
 
-  <ul class="chips">
-    {#each routines as routine (routine.id)}
-      <li
-        class="chip"
-        data-routine={routine.id}
-        class:active={routine.id === snapshot.panel.routine}
-      >
-        <span class="art" aria-hidden="true">{routine.artwork}</span>
-        <span class="label">{routine.label}</span>
-      </li>
-    {/each}
-  </ul>
+  <DeviceMirror
+    name="panel"
+    {online}
+    compact
+    centered
+    state={snapshot.panel.state}
+    headline={headline.text}
+    shout={headline.shout}
+    countdown={snapshot.panel.state === "countdown" ? (countdownText ?? "") : ""}
+    stateWord={stateWordText}
+    screen={headline.idle ? panelScreen : undefined}
+  />
+
+  <!-- The routine caps appear as inert chips, the active one lit — the same
+       symbol language as the remote's pad, with no affordance to press. -->
+  <CommandPad
+    items={legend}
+    readonly
+    columns={3}
+    busyId={snapshot.panel.routine}
+    label="Routines"
+  />
 </main>
 
 <style>
   .tile {
     box-sizing: border-box;
-    padding: var(--space-2);
+    max-width: 24rem;
+    margin: 0 auto;
+    padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
-  }
-
-  .panel {
-    position: relative;
-    display: block;
-    width: 100%;
-    max-width: 180px;
-    aspect-ratio: 53 / 11;
-  }
-  .panel .grid {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .mirror {
-    background: var(--c-surface);
-    border-radius: var(--radius);
-    padding: var(--space-1) var(--space-2);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .headline {
-    margin: 0;
-    font-size: clamp(1.5rem, 9vw, 2.2rem);
-    font-weight: 700;
-    line-height: 1.05;
-    word-break: break-word;
-  }
-  .countdown {
-    margin: 0;
-    font-size: clamp(1.3rem, 7vw, 1.9rem);
-    font-variant-numeric: tabular-nums;
-  }
-  .stateword {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .mirror.shout .headline {
-    color: var(--c-go);
-  }
-  /* Idle is the one state whose headline is a picture rather than a word, so it
-     is centred in the card like a badge instead of reading as a left-aligned
-     line of text (`design-system.md` §9). */
-  .mirror.idle {
-    align-items: center;
-    text-align: center;
-  }
-
-  .chips {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-1);
-  }
-  .chip {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 6px;
-    border-radius: var(--radius);
-    background: var(--c-surface);
-    color: var(--c-muted);
-    opacity: 0.5;
-  }
-  .chip.active {
-    background: var(--c-go);
-    color: var(--c-on);
-    opacity: 1;
-  }
-  .chip .art {
-    font-size: 1.5rem;
-    line-height: 1;
-  }
-  .chip .label {
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mirror.handoff .headline {
-      animation: none;
-    }
+    gap: 8px;
   }
 </style>

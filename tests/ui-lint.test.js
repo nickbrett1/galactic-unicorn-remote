@@ -21,11 +21,20 @@ const catalogue = JSON.parse(
 );
 const routines = catalogue.routines;
 
-/** Every `.svelte` file under `src/`. */
+/**
+ * Every `.svelte` file under `src/` *except* the vendored @nb blocks.
+ *
+ * `src/lib/components/nb/` is not this app's source: it is the registry's
+ * blocks, copied verbatim and pinned by digest in `.nb-registry.json`
+ * (`scripts/check-nb-blocks.mjs`). A block may quote a consumer's domain in its
+ * own documentation, and editing it here would break the digest, so the rule
+ * "this app hard-codes no routine" is enforced over the app's own components.
+ */
 function svelteFiles() {
   return readdirSync(join(root, "src"), { recursive: true })
     .filter((entry) => entry.endsWith(".svelte"))
-    .map((entry) => join(root, "src", entry));
+    .map((entry) => join(root, "src", entry))
+    .filter((file) => !file.includes(join("lib", "components", "nb")));
 }
 
 const svelteSources = svelteFiles().map((file) => ({
@@ -107,72 +116,111 @@ describe("no hard-coded labels, ids or artwork paths in any component", () => {
   });
 });
 
-/** Relative luminance of an `#rrggbb` colour. */
-function luminance(hex) {
-  const value = hex.replace("#", "");
-  const channels = [0, 2, 4]
-    .map((i) => Number.parseInt(value.slice(i, i + 2), 16) / 255)
-    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+/**
+ * The house palette lives in `src/app.css` (`@nb` theme, installed from the
+ * registry) plus this app's one override at the bottom of the file. Tokens are
+ * either `#rrggbb` or `rgba(...)` tints over the ground, so a "colour" here is
+ * { r, g, b, a } and every comparison composites onto `--bg` first.
+ */
+function tokens() {
+  const page = readFileSync(join(root, "src/app.css"), "utf8");
+  const found = {};
+  for (const [, name, value] of page.matchAll(/(--[a-z-]+):\s*([^;]+);/g)) {
+    found[name] = value.trim();
+  }
+  return found;
 }
 
-/** WCAG contrast ratio between two `#rrggbb` colours. */
+/** `#rrggbb` or `rgb()/rgba()` -> [r, g, b, a]. */
+function parseColour(value) {
+  if (value.startsWith("#")) {
+    return [
+      ...[0, 2, 4].map((i) => Number.parseInt(value.slice(1 + i, 3 + i), 16)),
+      1,
+    ];
+  }
+  const [r, g, b, a = 1] = value.match(/[\d.]+/g).map(Number);
+  return [r, g, b, a];
+}
+
+/** Composite a colour over an opaque ground. */
+function flatten(value, ground) {
+  const [r, g, b, a] = parseColour(value);
+  const [gr, gg, gb] = parseColour(ground);
+  return [r * a + gr * (1 - a), g * a + gg * (1 - a), b * a + gb * (1 - a)];
+}
+
+/** Relative luminance of a composited `[r, g, b]`. */
+function luminance(rgb) {
+  const [r, g, b] = rgb
+    .map((channel) => channel / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio between two composited `[r, g, b]` colours. */
 function contrast(a, b) {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/**
- * Pull the `--c-*` tokens out of the global stylesheet.
- *
- * The tokens live in `src/app.css` (loaded once by `+layout.svelte`) so both
- * surfaces share one palette (`design-system.md` §2).
- */
-function tokens() {
-  const page = readFileSync(join(root, "src/app.css"), "utf8");
-  const found = {};
-  for (const [, name, hex] of page.matchAll(
-    /(--c-[a-z-]+):\s*(#[0-9a-fA-F]{6})/g,
-  )) {
-    found[name] = hex;
-  }
-  return found;
-}
-
-describe("WCAG 2.1 AA contrast on the dark palette", () => {
+describe("WCAG 2.1 AA contrast on the house palette", () => {
   const t = tokens();
+  const bg = () => flatten(t["--bg"], t["--bg"]);
+  /** A token as it actually appears on the ground. */
+  const ink = (name) => flatten(t[name], t["--bg"]);
 
-  it("defines the full token set", () => {
+  it("defines the tokens the UI actually names", () => {
     for (const name of [
-      "--c-bg",
-      "--c-surface",
-      "--c-text",
-      "--c-muted",
-      "--c-go",
-      "--c-go-dim",
-      "--c-warn",
-      "--c-danger",
-      "--c-on",
+      "--bg",
+      "--bg-raised",
+      "--ink",
+      "--ink-dim",
+      "--ink-muted",
+      "--ink-strong",
+      "--accent",
+      "--ok",
+      "--warn",
+      "--bad",
+      "--neutral",
     ]) {
       expect(t[name], `missing ${name}`).toBeTruthy();
     }
   });
 
+  it("raises the tap target to a thumb's reach", () => {
+    // The house theme ships 44px; this app is pressed with wet hands.
+    expect(t["--tap"]).toBe("56px");
+  });
+
   it("meets 4.5:1 for every foreground/background pairing the UI uses", () => {
     const pairs = [
-      ["text on background", t["--c-text"], t["--c-bg"]],
-      ["text on surface", t["--c-text"], t["--c-surface"]],
-      ["muted on surface", t["--c-muted"], t["--c-surface"]],
-      ["label on routine button", t["--c-on"], t["--c-go"]],
-      ["label on pressed button", t["--c-on"], t["--c-go-dim"]],
-      ["label on cancel", t["--c-on"], t["--c-danger"]],
-      ["warn on surface", t["--c-warn"], t["--c-surface"]],
-      ["confirmed on background", t["--c-go"], t["--c-bg"]],
+      ["body text on the ground", ink("--ink"), bg()],
+      ["dim text on the ground", ink("--ink-dim"), bg()],
+      ["muted text on the ground", ink("--ink-muted"), bg()],
+      ["emphasis text on the ground", ink("--ink-strong"), bg()],
+      [
+        "body text on a card",
+        flatten(t["--ink"], t["--bg-raised"]),
+        flatten(t["--bg-raised"], t["--bg"]),
+      ],
+      [
+        "muted text on a card",
+        flatten(t["--ink-muted"], t["--bg-raised"]),
+        flatten(t["--bg-raised"], t["--bg"]),
+      ],
+      ["the accent on the ground", ink("--accent"), bg()],
+      ["a routine's glyph on its key", bg(), flatten(t["--ok"], t["--bg"])],
+      ["Cancel on its key", bg(), flatten(t["--bad"], t["--bg"])],
+      ["a warning on the ground", ink("--warn"), bg()],
+      ["a confirmation on the ground", ink("--ok"), bg()],
+      ["a failure on the ground", ink("--bad"), bg()],
+      ["a quiet label on the ground", ink("--neutral"), bg()],
     ];
-    for (const [label, fg, bg] of pairs) {
+    for (const [label, fg, ground] of pairs) {
       expect(
-        contrast(fg, bg),
-        `${label}: ${fg} on ${bg}`,
+        contrast(fg, ground),
+        `${label}: ${contrast(fg, ground).toFixed(2)}:1`,
       ).toBeGreaterThanOrEqual(4.5);
     }
   });

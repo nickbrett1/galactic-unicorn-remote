@@ -3,13 +3,16 @@
    * The remote — D1/D2/D3.
    *
    * Mobile-first and deliberately small: "a remote, not a control panel"
-   * (`spec/ui/design-system.md`). One button per routine (three on the panel's
-   * own buttons, plus the remote-only one) and one Cancel, one
-   * countdown-length chooser (1/2/3/5/10/20 min, default 5 — T6), a live mirror,
-   * and the honest "sent vs done" states. A routine or a length the connected
-   * panel's firmware cannot honour is withheld, never offered as a lie.
+   * (`spec/ui/design-system.md`). One press per routine (the panel's own
+   * buttons, plus the remote-only one) and one Cancel, one countdown-length
+   * chooser (default 5 — T6), a live mirror, and the honest "sent vs done"
+   * states. A routine or a length the connected panel's firmware cannot honour
+   * is withheld, never offered as a lie.
    *
-   * All of the wiring lives in pure helpers (`$lib/ui/format.js`,
+   * The shapes are the registry's, the logic is the app's: `AppShell` frames the
+   * page, `DeviceMirror` relays what the panel is showing, `CommandPad` is the
+   * keypad, `MessageBar` the idle-screen composer, and `ConfirmPrompt` the 409
+   * decision. All of the wiring lives in pure helpers (`$lib/ui/format.js`,
    * `$lib/ui/command.js`) so the one hard UX rule is unit-testable. Routine ids,
    * labels and artwork come ONLY from the catalogue on `data` — nothing here
    * hard-codes a label or a path (`design-system.md` §2).
@@ -20,7 +23,12 @@
   import { formatCountdown, formatLastSeen, mirrorHeadline, stateWord, labelForRoutine } from "$lib/ui/format.js";
   import { initialStatus, isBusy, reduceStatus, statusText, statusTone } from "$lib/ui/command.js";
   import { toPanelText } from "$lib/ui/panel-text.js";
-  import WeatherIndicator from "$lib/ui/WeatherIndicator.svelte";
+  import AppShell from "$lib/components/nb/AppShell.svelte";
+  import DeviceMirror from "$lib/components/nb/DeviceMirror.svelte";
+  import CommandPad from "$lib/components/nb/CommandPad.svelte";
+  import MessageBar from "$lib/components/nb/MessageBar.svelte";
+  import ConfirmPrompt from "$lib/components/nb/ConfirmPrompt.svelte";
+  import PanelScreen from "$lib/ui/PanelScreen.svelte";
 
   let { data } = $props();
 
@@ -112,6 +120,38 @@
       : "",
   );
 
+  // The pad is the routines the panel can start, plus the one big Cancel.
+  // Cancel maps to the panel's `D` — it is a command, so it shares the keypad,
+  // but it is not a routine and has no catalogue entry.
+  let padItems = $derived([
+    ...offeredRoutines.map((routine) => ({
+      id: routine.id,
+      label: routine.label,
+      icon: routine.artwork,
+      tone: "ok",
+    })),
+    { id: "cancel", label: "Cancel", icon: "✕", tone: "bad", span: "full", tall: true },
+  ]);
+
+  // Which pad target is in flight, and which one just landed. Ids, not booleans:
+  // the pad has to light the one command the status is about.
+  let busyId = $derived(
+    busy
+      ? status.action === "cancel"
+        ? "cancel"
+        : (status.routine ?? null)
+      : null,
+  );
+  let confirmedId = $derived(
+    status.kind === "confirmed" ? status.routine : null,
+  );
+
+  // The theme's tones are roles (ok/warn/bad/accent); the command reducer still
+  // speaks the app's words (go/danger). One mapping, in the view.
+  let noticeTone = $derived(
+    tone === "go" ? "ok" : tone === "danger" ? "bad" : tone,
+  );
+
   function dispatch(event) {
     status = reduceStatus(status, event);
   }
@@ -168,6 +208,11 @@
         nowMs: Date.now(),
       });
     }
+  }
+
+  function pressPad(item) {
+    if (item.id === "cancel") sendCommand("cancel");
+    else sendCommand("start", item.id, minutes);
   }
 
   async function sendMessage() {
@@ -311,519 +356,118 @@
 
 <svelte:head>
   <title>Home Display</title>
-  <meta name="theme-color" content="#0b0e0d" />
+  <meta name="theme-color" content="#0f172a" />
 </svelte:head>
 
-<main class="remote" data-online={online}>
-  <header class="head">
-    <h1>Home Display</h1>
-    {#if data.door?.email}
-      <p class="signed-in">signed in as {data.door.email}</p>
-    {/if}
-  </header>
-
-  <section
-    class="mirror"
-    aria-live="polite"
-    class:shout={headline.shout}
-    class:handoff={snapshot.panel.state === "handoff"}
-    data-state={snapshot.panel.state}
-  >
-    <p class="liveness" class:stale={!online}>
-      <span class="dot" aria-hidden="true"></span>
-      panel: last seen {formatLastSeen(lastSeenS)}
-    </p>
-    {#if headline.idle}
-      <!-- The idle headline is a picture of the panel itself: a 53x11 LED
-           matrix, dark body, one lit pixel in the top-left. Inline only —
-           no external artwork (`tests/ui-lint.test.js`). The panel's own idle
-           screen shows the weather, so the reading is drawn INSIDE this
-           picture (§9), not below it. -->
-      <span class="panel" role="img" aria-label="Panel: idle, top-left pixel lit">
-        <svg class="grid" viewBox="0 0 53 11" aria-hidden="true" focusable="false">
-          <defs>
-            <pattern
-              id="panel-dots"
-              width="1"
-              height="1"
-              patternUnits="userSpaceOnUse"
-            >
-              <circle cx="0.5" cy="0.5" r="0.16" fill="var(--c-muted)" />
-            </pattern>
-          </defs>
-          <rect
-            x="0.25"
-            y="0.25"
-            width="52.5"
-            height="10.5"
-            rx="1.5"
-            fill="var(--c-surface)"
-            stroke="var(--c-muted)"
-            stroke-width="0.5"
-          />
-          <rect
-            x="0.25"
-            y="0.25"
-            width="52.5"
-            height="10.5"
-            rx="1.5"
-            fill="url(#panel-dots)"
-            opacity="0.25"
-          />
-          <rect x="0.25" y="0.25" width="1" height="1" fill="var(--c-text)" />
-        </svg>
-        <!-- The idle panel IS the panel's weather screen, so the same reading
-             the hardware is drawing is drawn inside the picture (idle only — a
-             countdown draws the routine, not the sky). No reading renders
-             nothing (firmware lib/weather.py, design-system.md §9). -->
-        <WeatherIndicator
-          variant="screen"
-          condition={snapshot.panel?.condition}
-          tempC={snapshot.panel?.temp_c}
-        />
-      </span>
-    {:else}
-      <p class="routine">{headline.text}</p>
-    {/if}
-    {#if snapshot.panel.state === "countdown" && countdownText}
-      <p class="countdown">{countdownText}</p>
-    {/if}
-    <p class="stateword">{stateWordText}</p>
-    {#if liveBanner}
-      <p class="banner">scrolling: “{liveBanner}”</p>
-    {/if}
-  </section>
-
-  {#if !online}
-    <p class="caveat" role="alert">
-      The panel is offline — controls are disabled until it's seen again.
-    </p>
-  {/if}
-
-  {#if status.kind === "conflict"}
-    <div class="conflict" role="alertdialog" aria-labelledby="conflict-msg">
-      <p id="conflict-msg">{conflictCurrentLabel} is running — start instead?</p>
-      <div class="conflict-actions">
-        <button
-          type="button"
-          class="replace"
-          bind:this={replaceBtn}
-          onclick={() => sendCommand("replace", status.requested, minutes)}
-        >
-          Replace
-        </button>
-        <button type="button" class="keep" onclick={() => dispatch({ type: "reset" })}>
-          Keep
-        </button>
-      </div>
-    </div>
-  {/if}
-
-  <!-- The countdown length a start asks for. Rendered from `$lib/minutes.js`
-       narrowed by `$lib/ui/firmware.js` to what the connected panel can honour,
-       so the offered buttons and the accepted values cannot drift. It is a
-       chooser, not a routine: the panel still receives only the four button
-       events. -->
-  <div class="minutes" role="group" aria-label="Timer length">
-    {#each offeredMinutes as choice (choice)}
-      <button
-        type="button"
-        class="minute"
-        class:selected={minutes === choice}
-        aria-pressed={minutes === choice}
-        disabled={disabled}
-        onclick={() => (minutes = choice)}
-      >
-        {choice} min
-      </button>
-    {/each}
-  </div>
-
-  <ul class="controls">
-    {#each offeredRoutines as routine (routine.id)}
-      <li>
-        <button
-          type="button"
-          class="routine"
-          data-routine={routine.id}
-          disabled={disabled}
-          class:in-flight={status.routine === routine.id && busy}
-          class:confirmed={status.kind === "confirmed" && status.routine === routine.id}
-          onclick={() => sendCommand("start", routine.id, minutes)}
-        >
-          <span class="art" aria-hidden="true">{routine.artwork}</span>
-          <span class="label">{routine.label}</span>
-        </button>
-      </li>
-    {/each}
-  </ul>
-
-  <button
-    type="button"
-    class="cancel"
-    disabled={disabled}
-    class:in-flight={busy && status.action === "cancel"}
-    onclick={() => sendCommand("cancel")}
-  >
-    Cancel
-  </button>
-
-  {#if showComposer}
-    <!-- The message composer. It draws on the panel's idle screen, so it is
-         offered only while the panel is idle: a scroll over a running countdown
-         would mean nothing (design-system.md §10). -->
-    <form
-      class="message"
-      aria-label="Scroll a message across the panel"
-      onsubmit={(event) => {
-        event.preventDefault();
-        sendMessage();
-      }}
-    >
-      <label class="sr-only" for="panel-message">Message for the panel</label>
-      <input
-        id="panel-message"
-        type="text"
-        maxlength={messageMaxLen}
-        placeholder="Message for the panel"
-        value={messageText}
-        oninput={(event) => {
-          // Accept only what the panel can draw (design-system.md §10.2): a
-          // phone keyboard's curly quotes and dashes are folded back to ASCII,
-          // and anything the LED font has no glyph for is dropped here, so the
-          // server never has to refuse a message that looked fine to type.
-          const clean = toPanelText(event.currentTarget.value);
-          // Write it back even when it matches the previous value: a dropped
-          // character (e.g. an emoji) leaves `messageText` unchanged, and
-          // without this the field would still show what it just refused.
-          if (clean !== event.currentTarget.value)
-            event.currentTarget.value = clean;
-          messageText = clean;
-        }}
+<AppShell
+  title="Home Display"
+  subtitle={data.door?.email ? `signed in as ${data.door.email}` : ""}
+  footer={false}
+>
+  <div class="remote" data-online={online}>
+    {#snippet panelScreen()}
+      <PanelScreen
+        condition={snapshot.panel?.condition}
+        tempC={snapshot.panel?.temp_c}
       />
-      <button
-        type="submit"
-        class="send"
-        disabled={busy || messageText.trim().length === 0}
-        class:in-flight={busy && status.action === "message"}
-      >
-        Send
-      </button>
-    </form>
-  {/if}
+    {/snippet}
 
-  {#if statusWord}
-    <p class="status" role="status" data-tone={tone}>{statusWord}</p>
-  {/if}
-</main>
+    <DeviceMirror
+      name="panel"
+      {online}
+      liveness={{ label: "panel", seen: formatLastSeen(lastSeenS) }}
+      state={snapshot.panel.state}
+      headline={headline.text}
+      shout={headline.shout}
+      countdown={snapshot.panel.state === "countdown" ? (countdownText ?? "") : ""}
+      stateWord={stateWordText}
+      banner={liveBanner ?? ""}
+      screen={headline.idle ? panelScreen : undefined}
+    />
+
+    {#if !online}
+      <p class="notice warn" role="alert">
+        The panel is offline — controls are disabled until it's seen again.
+      </p>
+    {/if}
+
+    {#if status.kind === "conflict"}
+      <ConfirmPrompt
+        message="{conflictCurrentLabel} is running — start instead?"
+        confirmLabel="Replace"
+        cancelLabel="Keep"
+        tone="warn"
+        bind:element={replaceBtn}
+        onconfirm={() => sendCommand("replace", status.requested, minutes)}
+        oncancel={() => dispatch({ type: "reset" })}
+      />
+    {/if}
+
+    <!-- The countdown length a start asks for. A `.seg` that owns the row and
+         every target is a thumb (`.seg.tap`): one choice from a closed set, not
+         a routine. The panel still receives only the button events. -->
+    <div class="seg tap" role="group" aria-label="Timer length">
+      {#each offeredMinutes as choice (choice)}
+        <button
+          type="button"
+          class:on={minutes === choice}
+          aria-pressed={minutes === choice}
+          disabled={disabled}
+          onclick={() => (minutes = choice)}
+        >
+          {choice} min
+        </button>
+      {/each}
+    </div>
+
+    <CommandPad
+      items={padItems}
+      label="Routines"
+      disabled={disabled}
+      busyId={busyId}
+      confirmedId={confirmedId}
+      onpress={pressPad}
+    />
+
+    {#if showComposer}
+      <!-- The message composer. It draws on the panel's idle screen, so it is
+           offered only while the panel is idle: a scroll over a running countdown
+           would mean nothing (design-system.md §10). -->
+      <MessageBar
+        bind:value={messageText}
+        label="Message for the panel"
+        placeholder="Message for the panel"
+        maxLength={messageMaxLen}
+        submitLabel="Send"
+        sanitize={toPanelText}
+        disabled={busy}
+        pending={busy && status.action === "message"}
+        onsubmit={sendMessage}
+      />
+    {/if}
+
+    {#if statusWord}
+      <p class="status notice {noticeTone}" role="status">{statusWord}</p>
+    {/if}
+  </div>
+</AppShell>
 
 <style>
-  /* Tokens and the base body live in `src/app.css` (loaded by `+layout.svelte`)
-     so the read-only tile at `/tile` shares them — `design-system.md` §2. */
-
   .remote {
     box-sizing: border-box;
     max-width: 30rem;
     margin: 0 auto;
-    min-height: 100dvh;
-    padding: max(var(--space-2), env(safe-area-inset-top)) var(--space-2)
-      calc(var(--space-2) + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 16px;
+    padding-bottom: calc(8px + var(--safe-bottom));
   }
 
-  .head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1);
-  }
-  .head h1 {
-    font-size: 1.15rem;
-    margin: 0;
-    letter-spacing: 0.02em;
-  }
-  .signed-in {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.8rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mirror {
-    background: var(--c-surface);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .liveness {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--c-go);
-    display: inline-block;
-  }
-  .liveness.stale .dot {
-    background: var(--c-danger);
-  }
-  .panel {
-    position: relative;
-    display: block;
-    width: 100%;
-    max-width: 220px;
-    aspect-ratio: 53 / 11;
-  }
-  .panel .grid {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  .routine {
-    margin: 0;
-    font-size: clamp(2rem, 12vw, 3rem);
-    font-weight: 700;
-    line-height: 1.05;
-    word-break: break-word;
-  }
-  .countdown {
-    margin: 0;
-    font-size: clamp(1.6rem, 9vw, 2.4rem);
-    font-variant-numeric: tabular-nums;
-  }
-  .stateword {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .mirror.shout .routine {
-    color: var(--c-go);
-  }
-  .mirror.handoff .routine {
-    animation: shout 0.6s ease-in-out 2;
-  }
-  @keyframes shout {
-    50% {
-      transform: scale(1.06);
-    }
-  }
-
-  .caveat {
-    margin: 0;
-    color: var(--c-warn);
-    font-weight: 600;
-  }
-
-  .controls {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-1);
-  }
-  .controls li {
-    display: flex;
-  }
-
-  .minutes {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-    gap: var(--space-1);
-  }
-  .minute {
-    background: var(--c-surface);
-    color: var(--c-text);
-    border: 1px solid var(--c-muted);
-    font-weight: 600;
-    min-height: var(--tap-min);
-  }
-  .minute.selected {
-    background: var(--c-text);
-    color: var(--c-bg);
-    border-color: var(--c-text);
-  }
-
-  button {
-    font: inherit;
-    border: 0;
-    cursor: pointer;
-    border-radius: var(--radius);
-    min-height: var(--tap-min);
-    width: 100%;
-  }
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-  button:focus-visible {
-    outline: 3px solid var(--c-text);
-    outline-offset: 3px;
-  }
-
-  .routine {
-    background: var(--c-go);
-    color: var(--c-on);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: var(--space-1);
-  }
-  .routine .art {
-    font-size: 2rem;
-    line-height: 1;
-  }
-  .routine .label {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-  .routine.in-flight {
-    background: var(--c-go-dim);
-  }
-  .routine.confirmed {
-    background: var(--c-go);
-    animation: confirm 0.7s ease-out;
-  }
-  @keyframes confirm {
-    0% {
-      box-shadow: 0 0 0 0 var(--c-go);
-    }
-    100% {
-      box-shadow: 0 0 0 14px transparent;
-    }
-  }
-
-  .cancel {
-    background: var(--c-danger);
-    color: var(--c-on);
-    min-height: 72px;
-    font-size: 1.3rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-  }
-  .cancel.in-flight {
-    background: var(--c-warn);
-  }
-
-  .status {
-    margin: auto 0 0;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius);
+  /* The status line is the last thing in the flow; push it to the bottom when
+     the viewport leaves room, like the old page did. */
+  .remote :global(.status) {
+    margin-top: auto;
     text-align: center;
-    font-weight: 600;
-    background: var(--c-surface);
-  }
-  .status[data-tone="warn"] {
-    color: var(--c-warn);
-  }
-  .status[data-tone="go"] {
-    color: var(--c-go);
-  }
-  .status[data-tone="danger"] {
-    color: var(--c-danger);
-  }
-
-  .banner {
-    margin: 0;
-    color: var(--c-muted);
-    font-size: 0.9rem;
-  }
-
-  .message {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: var(--space-1);
-  }
-  .message input {
-    font: inherit;
-    color: var(--c-text);
-    background: var(--c-surface);
-    border: 1px solid var(--c-muted);
-    border-radius: var(--radius);
-    padding: 0 var(--space-2);
-    min-height: var(--tap-min);
-    min-width: 0;
-  }
-  .message input::placeholder {
-    color: var(--c-muted);
-  }
-  .message input:focus-visible {
-    outline: 3px solid var(--c-text);
-    outline-offset: 2px;
-  }
-  .message .send {
-    width: auto;
-    padding: 0 var(--space-2);
-    background: var(--c-go);
-    color: var(--c-on);
-    font-weight: 700;
-  }
-  .message .send.in-flight {
-    background: var(--c-go-dim);
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .conflict {
-    background: var(--c-surface);
-    border: 2px solid var(--c-warn);
-    border-radius: var(--radius);
-    padding: var(--space-2);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .conflict p {
-    margin: 0;
-    color: var(--c-warn);
-    font-weight: 600;
-  }
-  .conflict-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-1);
-  }
-  .replace {
-    background: var(--c-warn);
-    color: var(--c-on);
-    font-weight: 700;
-  }
-  .keep {
-    background: var(--c-surface);
-    color: var(--c-text);
-    border: 1px solid var(--c-muted);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mirror.handoff .routine,
-    .routine.confirmed {
-      animation: none;
-    }
+    font-size: 13px;
   }
 </style>

@@ -114,7 +114,7 @@ describe("the tile mirrors the remote, read-only", () => {
     });
     const active = container.querySelectorAll(".chip.active");
     expect(active).toHaveLength(1);
-    expect(active[0].getAttribute("data-routine")).toBe("cleanup");
+    expect(active[0].getAttribute("data-command")).toBe("cleanup");
   });
 
   it("renders one chip per catalogue routine", () => {
