@@ -27,14 +27,14 @@ memo §9, §9.1, §12; default conventions (WCAG 2.1 AA, semantic HTML, keyboard
 ## 2. Design tokens — the house theme, installed
 
 The palette is **not this app's to invent**. It is the `@nb` theme from the ui-registry
-(`registry/versions/v1.17.0/theme.json`), written into `src/app.css` by the installer, plus exactly
+(`registry/versions/v1.18.0/theme.json`), written into `src/app.css` by the installer, plus exactly
 one rule of this app's own at the bottom of that file. Colours keep the **house language**: green
 means go, red is an exception. Do not replicate the panel's full ramp — the phone is a remote, not a
 second display (memo §9).
 
 | Token | Value intent | Use here |
 |---|---|---|
-| `--bg` | slate ground (`#0f172a`), matches the panel's dark surround | page background, and the ink on a filled `--ok`/`--bad` key |
+| `--bg` | slate ground (`#0b1220`), darker than the phone's bezel edge | page background, and the ink on a filled `--ok`/`--bad` key |
 | `--bg-raised` | a translucent lift of the ground | `.card`: the mirror, the conflict prompt, the status notice |
 | `--bg-sunken` | the ground *below* the page | the LED matrix the idle screen is drawn on |
 | `--bg-overlay` | the ground made nearly opaque | the sticky top bar of `app-shell` |
@@ -44,13 +44,18 @@ second display (memo §9).
 | `--ink-muted` | muted | "last seen 2 s ago", secondary labels |
 | `--ink-faint` | faintest | the unlit pixels of the LED matrix |
 | `--ink-strong` | the top of the ramp | the routine name on HANDOFF |
-| `--accent` | the house link (sky) | the weather reading on the idle screen |
-| `--ok` / `--ok-bg` | green | routine keys, CONFIRMED, "showing on the panel" |
-| `--warn` / `--warn-bg` | amber | "sending…", a conflict, the offline notice |
-| `--bad` / `--bad-bg` | red | Cancel *only* — red is otherwise unused (memo §9), so it reads as an exception |
+| `--accent` | the house link (sky-400, `#38bdf8`) | the weather reading on the idle screen |
+| `--ok` / `--ok-bg` | green (`#34d399`) | routine keys, CONFIRMED, "showing on the panel" |
+| `--warn` / `--warn-bg` | amber (`#fb923c`) | "sending…", a conflict, the offline notice |
+| `--bad` / `--bad-bg` | red (`#f87171`) | Cancel *only* — red is otherwise unused (memo §9), so it reads as an exception |
 | `--radius` / `--radius-sm` / `--radius-pill` | 8 / 6 / 999 px | one visual grammar |
 | `--mono` | tabular figures | every number: the countdown, the message counter |
 | `--tap` | **56 px**, raised from the theme's 44 px | every control; Cancel is full-width and taller still |
+
+1.18.0 raised the chroma one step: the 300-weight pastels were measurable (ink 15:1) but read as
+grey on a phone in a dark room, so the semantic hues are now the 400s and the tints are denser. The
+ink ramp is untouched. `theme-color` in `app.html` follows `--bg` — browser chrome that keeps the old
+navy above a page that has moved on leaves a visible seam at the top of the screen.
 
 The one app-level override is `:root { --tap: 56px }`: a theme token set to *this* device's role —
 wet hands, arm's length — rather than a new colour. Nothing else is redeclared, so the app cannot
@@ -63,7 +68,7 @@ Theme **classes** come with the theme and are the only styling vocabulary: `.car
 ### 2.1 The blocks this screen is made of
 
 The UI is assembled from published, pinned ui-registry blocks — vendored verbatim into
-`src/lib/components/nb/` and checked against `.nb-registry.json` (1.17.0) by
+`src/lib/components/nb/` and checked against `.nb-registry.json` (1.18.0) by
 `scripts/check-nb-blocks.mjs`. Editing one here is a bug; upgrade the pin instead.
 
 | Block | What it is on this screen |

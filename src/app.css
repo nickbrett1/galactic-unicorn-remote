@@ -3,10 +3,16 @@
  * Two references, one language:
  *   - deepseek-balance (the house *app* grammar): slate ground, hairline borders,
  *     10px uppercase micro-labels with .05em tracking, tabular figures, pill
- *     badges, 8px card radius, no pure black (#0f172a, not #000), colour carried
- *     by rgba tints rather than solid pastels.
- *   - fintechnick (the house *voice*): cream-yellow for emphasis (#fce4b8), green
- *     for "good", system sans + monospace for anything numeric or identifier-like.
+ *     badges, 8px card radius, no pure black (#0b1220, not #000), colour carried
+ *     by rgba tints *under* a saturated ink rather than by pastels.
+ *   - fintechnick (the house *voice*): amber for emphasis (#fcd34d), green for
+ *     "good", system sans + monospace for anything numeric or identifier-like.
+ *
+ * 1.18.0 raised the chroma one step. The 300-weight pastels (#6ee7b7, #7dd3fc,
+ * #fdba74, #fca5a5, #fce4b8) are legible but read as washed out on a phone in a
+ * dark room: a keypad of pale mint glyphs on navy has no "press me" in it. The
+ * semantic hues are now the 400s and the tints a little denser, while the ground
+ * went a shade deeper so the tints still separate from it.
  *
  * The values are lifted from those two rather than invented, so a screen here
  * sits next to a Homepage widget or a portfolio page without looking like a
@@ -17,20 +23,20 @@
   color-scheme: dark;
 
   /* ground + surfaces */
-  --bg: #0f172a; /* slate-900, deepseek-balance's html/body */
-  --bg-raised: rgba(30, 41, 59, 0.55); /* .card fill */
-  --bg-sunken: rgba(15, 23, 42, 0.35); /* .chart fill */
-  --bg-hover: rgba(51, 65, 85, 0.5);
-  --bg-selected: #334155; /* .seg button.on */
+  --bg: #0b1220; /* slate-950 with the blue left in: a ground, not a hole */
+  --bg-raised: rgba(30, 41, 59, 0.72); /* .card fill */
+  --bg-sunken: rgba(2, 6, 16, 0.45); /* .chart fill */
+  --bg-hover: rgba(51, 65, 85, 0.6);
+  --bg-selected: #3b4a63; /* .seg button.on */
   /* A ground that has content *behind* it: a sticky row or a sheet that must
      stay legible while the page scrolls under it. It is `--bg` made nearly
      opaque on purpose -- fully opaque would read as a second page, and a
      translucent `--bg-raised` lets the text underneath ghost through. */
-  --bg-overlay: rgba(15, 23, 42, 0.93);
+  --bg-overlay: rgba(11, 18, 32, 0.95);
 
   /* hairlines — borders are tints, not greys */
-  --line: rgba(148, 163, 184, 0.14);
-  --line-strong: rgba(148, 163, 184, 0.25);
+  --line: rgba(148, 163, 184, 0.16);
+  --line-strong: rgba(148, 163, 184, 0.3);
 
   /* ink */
   --ink: #e2e8f0;
@@ -45,27 +51,27 @@
   --ink-strong: #f1f5f9;
 
   /* accents */
-  --accent: #7dd3fc; /* sky-300 — the house link */
-  --accent-soft: rgba(125, 211, 252, 0.14);
+  --accent: #38bdf8; /* sky-400 — the house link, at full chroma */
+  --accent-soft: rgba(56, 189, 248, 0.16);
   /* An accent *hairline*: the border of something the accent has picked out --
      a chip that is on, the button under the pointer. `--line` is the neutral
      hairline; this is the same idea in the accent colour, in two weights, so a
      selected state can be told from a hovered one without inventing a third
      opacity in each component. */
-  --accent-line: rgba(125, 211, 252, 0.4);
-  --accent-line-strong: rgba(125, 211, 252, 0.55);
-  --ok: #6ee7b7;
-  --ok-bg: rgba(52, 211, 153, 0.15);
-  --warn: #fdba74;
-  --warn-bg: rgba(251, 146, 60, 0.15);
-  --bad: #fca5a5;
-  --bad-bg: rgba(248, 113, 113, 0.18);
+  --accent-line: rgba(56, 189, 248, 0.45);
+  --accent-line-strong: rgba(56, 189, 248, 0.62);
+  --ok: #34d399;
+  --ok-bg: rgba(52, 211, 153, 0.18);
+  --warn: #fb923c;
+  --warn-bg: rgba(251, 146, 60, 0.18);
+  --bad: #f87171;
+  --bad-bg: rgba(248, 113, 113, 0.22);
   --neutral: #94a3b8;
-  --neutral-bg: rgba(148, 163, 184, 0.15);
+  --neutral-bg: rgba(148, 163, 184, 0.16);
 
   /* search highlights: fintechnick's cream, the one warm note in the palette */
-  --mark: #fce4b8;
-  --mark-bg: rgba(252, 228, 184, 0.18);
+  --mark: #fcd34d;
+  --mark-bg: rgba(252, 211, 77, 0.2);
 
   /* On an iPhone home screen the app launches with the status bar drawn *over*
    the page (`apple-mobile-web-app-status-bar-style: black-translucent` plus
