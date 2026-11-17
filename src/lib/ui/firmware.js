@@ -28,8 +28,8 @@ export const TWO_MINUTES_SINCE = "0.1.52";
 /** The board firmware that first accepted a 20-minute countdown (board `0.1.57`). */
 export const TWENTY_MINUTES_SINCE = "0.1.57";
 
-/** The board firmware that first accepted a 15-minute countdown (board `0.1.58`). */
-export const FIFTEEN_MINUTES_SINCE = "0.1.58";
+/** The board firmware that first accepted a 15-minute countdown (board `0.1.59`). */
+export const FIFTEEN_MINUTES_SINCE = "0.1.59";
 
 /**
  * The earliest firmware that honours each length the remote offers, for the

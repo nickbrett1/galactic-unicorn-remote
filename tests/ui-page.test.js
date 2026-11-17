@@ -227,7 +227,7 @@ describe("D1 — the shell and its controls", () => {
 
   it("withholds a length the panel cannot honour, then reveals it once the panel updates", async () => {
     // A board older than 0.1.51 would silently downgrade a 10-minute ask (and,
-    // below 0.1.52, a 2-minute one; below 0.1.57, a 20-minute one; below 0.1.58,
+    // below 0.1.52, a 2-minute one; below 0.1.57, a 20-minute one; below 0.1.59,
     // a 15-minute one) to its routine default, so the buttons are not offered at
     // all (T6.1/T6.2 stopgap).
     renderPage({ panel: { fw: "0.1.50" } });
@@ -261,8 +261,8 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "20 min" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "15 min" })).toBeNull();
 
-    // The newest step: 0.1.58 honours 15 minutes.
-    await emitState({ fw: "0.1.58" });
+    // The newest step: 0.1.59 honours 15 minutes.
+    await emitState({ fw: "0.1.59" });
     expect(screen.getByRole("button", { name: "15 min" })).toBeTruthy();
   });
 

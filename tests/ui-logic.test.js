@@ -413,7 +413,7 @@ describe("firmware — offer only the lengths the connected panel can honour", (
     expect(availableMinutes(FIFTEEN_MINUTES_SINCE)).toEqual([
       ...MINUTES_CHOICES,
     ]);
-    expect(availableMinutes("0.1.58")).toEqual([...MINUTES_CHOICES]);
+    expect(availableMinutes("0.1.59")).toEqual([...MINUTES_CHOICES]);
     expect(availableMinutes("1.0.0")).toEqual([...MINUTES_CHOICES]);
   });
 

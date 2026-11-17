@@ -69,10 +69,10 @@
   // The lengths the *connected panel* can honour (T6.1/T6.2 stopgap). A board
   // older than 0.1.51 would silently downgrade a 10-minute ask to its routine
   // default, one older than 0.1.52 would do the same for 2 minutes, one older
-  // than 0.1.57 for 20 minutes, and one older than 0.1.58 for 15 minutes, so
+  // than 0.1.57 for 20 minutes, and one older than 0.1.59 for 15 minutes, so
   // never offer a length it cannot do — better no button than a lie. Unknown
   // `fw` errs safe the same way; 10 needs >= 0.1.51, 2 needs >= 0.1.52,
-  // 20 needs >= 0.1.57 and 15 needs >= 0.1.58.
+  // 20 needs >= 0.1.57 and 15 needs >= 0.1.59.
   let offeredMinutes = $derived(availableMinutes(snapshot?.panel?.fw));
 
   // Never leave the chooser on a length the panel dropped out from under it: if
