@@ -434,6 +434,25 @@ describe("/api/start minutes — the remote-chosen countdown length (T6)", () =>
     });
   });
 
+  it("accepts 15 minutes as a choice", async () => {
+    poll({ url: pollUrl({ boot: "b1" }) });
+    recordObserved(pollReport({ state: "ambient" }), nowEpochS());
+
+    const res = await post(postStart, { routine: "bathtime", minutes: 15 });
+    expect(res.status).toBe(202);
+    expect((await res.json()).minutes).toBe(15);
+    expect(getDesired()).toMatchObject({ action: "start", minutes: 15 });
+
+    const polled = await poll({
+      url: pollUrl({ boot: "b1", applied_gen: "0", state: "ambient" }),
+    });
+    expect(await polled.json()).toMatchObject({
+      action: "start",
+      routine: "bathtime",
+      minutes: 15,
+    });
+  });
+
   it("carries the chosen length through a replace's cancel → start", async () => {
     poll({
       url: pollUrl({

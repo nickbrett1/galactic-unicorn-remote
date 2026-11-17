@@ -28,6 +28,9 @@ export const TWO_MINUTES_SINCE = "0.1.52";
 /** The board firmware that first accepted a 20-minute countdown (board `0.1.57`). */
 export const TWENTY_MINUTES_SINCE = "0.1.57";
 
+/** The board firmware that first accepted a 15-minute countdown (board `0.1.58`). */
+export const FIFTEEN_MINUTES_SINCE = "0.1.58";
+
 /**
  * The earliest firmware that honours each length the remote offers, for the
  * lengths that were added after T6. A length with no entry here (1, 3, 5) is as
@@ -36,6 +39,7 @@ export const TWENTY_MINUTES_SINCE = "0.1.57";
 const MINUTES_SINCE = Object.freeze({
   2: TWO_MINUTES_SINCE,
   10: TEN_MINUTES_SINCE,
+  15: FIFTEEN_MINUTES_SINCE,
   20: TWENTY_MINUTES_SINCE,
 });
 

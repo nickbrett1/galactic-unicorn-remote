@@ -207,9 +207,9 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "Clothes On" })).toBeTruthy();
   });
 
-  it("offers the 1/2/3/5/10/20-minute countdown length, defaulting to 5", () => {
+  it("offers the 1/2/3/5/10/15/20-minute countdown length, defaulting to 5", () => {
     renderPage();
-    for (const minutes of [1, 2, 3, 5, 10, 20]) {
+    for (const minutes of [1, 2, 3, 5, 10, 15, 20]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }),
       ).toBeTruthy();
@@ -218,7 +218,7 @@ describe("D1 — the shell and its controls", () => {
     expect(screen.getByRole("button", { name: "5 min" }).ariaPressed).toBe(
       "true",
     );
-    for (const minutes of [1, 2, 3, 10, 20]) {
+    for (const minutes of [1, 2, 3, 10, 15, 20]) {
       expect(
         screen.getByRole("button", { name: `${minutes} min` }).ariaPressed,
       ).toBe("false");
@@ -227,8 +227,9 @@ describe("D1 — the shell and its controls", () => {
 
   it("withholds a length the panel cannot honour, then reveals it once the panel updates", async () => {
     // A board older than 0.1.51 would silently downgrade a 10-minute ask (and,
-    // below 0.1.52, a 2-minute one; below 0.1.57, a 20-minute one) to its
-    // routine default, so the buttons are not offered at all (T6.1/T6.2 stopgap).
+    // below 0.1.52, a 2-minute one; below 0.1.57, a 20-minute one; below 0.1.58,
+    // a 15-minute one) to its routine default, so the buttons are not offered at
+    // all (T6.1/T6.2 stopgap).
     renderPage({ panel: { fw: "0.1.50" } });
     for (const minutes of [1, 3, 5]) {
       expect(
@@ -237,6 +238,7 @@ describe("D1 — the shell and its controls", () => {
     }
     expect(screen.queryByRole("button", { name: "2 min" })).toBeNull();
     expect(screen.queryByRole("button", { name: "10 min" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "15 min" })).toBeNull();
     expect(screen.queryByRole("button", { name: "20 min" })).toBeNull();
 
     // The panel steps up a release: a 0.1.51 board now honours 10, but a 2-minute
@@ -244,17 +246,24 @@ describe("D1 — the shell and its controls", () => {
     await emitState({ fw: "0.1.51" });
     expect(screen.getByRole("button", { name: "10 min" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "2 min" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "15 min" })).toBeNull();
     expect(screen.queryByRole("button", { name: "20 min" })).toBeNull();
 
     // It steps up again: 0.1.52 honours both, and the live mirror reveals 2.
     await emitState({ fw: "0.1.52" });
     expect(screen.getByRole("button", { name: "2 min" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "10 min" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "15 min" })).toBeNull();
     expect(screen.queryByRole("button", { name: "20 min" })).toBeNull();
 
-    // One more step: 0.1.57 honours 20 minutes, the newest length.
+    // One more step: 0.1.57 honours 20 minutes, but 15 is still one release away.
     await emitState({ fw: "0.1.57" });
     expect(screen.getByRole("button", { name: "20 min" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "15 min" })).toBeNull();
+
+    // The newest step: 0.1.58 honours 15 minutes.
+    await emitState({ fw: "0.1.58" });
+    expect(screen.getByRole("button", { name: "15 min" })).toBeTruthy();
   });
 
   it("sends the chosen countdown length on a start", async () => {

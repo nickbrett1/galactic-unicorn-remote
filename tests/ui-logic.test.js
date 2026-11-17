@@ -23,6 +23,7 @@ import {
 import { isPanelText, toPanelText } from "../src/lib/ui/panel-text.js";
 import {
   CLOTHES_SINCE,
+  FIFTEEN_MINUTES_SINCE,
   MEALTIME_SINCE,
   SHOES_SINCE,
   TEN_MINUTES_SINCE,
@@ -408,11 +409,11 @@ describe("firmware — offer only the lengths the connected panel can honour", (
     expect(compareFirmware("dev", "0.1.0")).toBeLessThan(0);
   });
 
-  it("offers the full catalogue once a panel reports the 20-minute firmware", () => {
-    expect(availableMinutes(TWENTY_MINUTES_SINCE)).toEqual([
+  it("offers the full catalogue once a panel reports the 15-minute firmware", () => {
+    expect(availableMinutes(FIFTEEN_MINUTES_SINCE)).toEqual([
       ...MINUTES_CHOICES,
     ]);
-    expect(availableMinutes("0.1.57")).toEqual([...MINUTES_CHOICES]);
+    expect(availableMinutes("0.1.58")).toEqual([...MINUTES_CHOICES]);
     expect(availableMinutes("1.0.0")).toEqual([...MINUTES_CHOICES]);
   });
 
@@ -430,7 +431,16 @@ describe("firmware — offer only the lengths the connected panel can honour", (
     expect(availableMinutes("0.1.56")).toEqual([1, 2, 3, 5, 10]);
   });
 
-  it("withholds 2, 10 and 20 minutes from an older (or unknown) panel", () => {
+  it("offers 20 but not yet 15 on the firmware before it", () => {
+    // 15 minutes lands a release after 20: a 0.1.57 panel honours
+    // 1/2/3/5/10/20 and would still downgrade a 15-minute ask.
+    expect(availableMinutes(TWENTY_MINUTES_SINCE)).toEqual([
+      1, 2, 3, 5, 10, 20,
+    ]);
+    expect(availableMinutes("0.1.57")).toEqual([1, 2, 3, 5, 10, 20]);
+  });
+
+  it("withholds 2, 10, 15 and 20 minutes from an older (or unknown) panel", () => {
     expect(availableMinutes("0.1.50")).toEqual([1, 3, 5]);
     expect(availableMinutes("0.1.0")).toEqual([1, 3, 5]);
     expect(availableMinutes(undefined)).toEqual([1, 3, 5]);
